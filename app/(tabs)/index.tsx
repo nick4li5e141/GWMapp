@@ -1,75 +1,140 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import React, { ReactElement } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+interface Styles {
+  container: {
+    flex: number;
+    alignItems: 'center';
+    justifyContent: 'center';
+    padding: number;
+  };
+  logo: {
+    width: number;
+    height: number;
+    marginBottom: number;
+  };
+  name: {
+    fontSize: number;
+    fontWeight: 'bold';
+    marginTop: number;
+  };
+  title: {
+    fontSize: number;
+    marginBottom: number;
+    color: string;
+  };
+  welcomeMessage: {
+    fontSize: number;
+    marginVertical: number;
+    textAlign: 'center';
+  };
+  contactInfo: {
+    fontSize: number;
+    marginVertical: number;
+    color: string;
+  };
+  buttonContainer: {
+    marginTop: number;
+  };
+  button: {
+    backgroundColor: '#007BFF'; // Example button color
+    padding: number;
+    borderRadius: number;
+    marginVertical: number;
+    alignItems: 'center';
+  };
+  buttonText: {
+    color: 'white';
+    fontSize: number;
+    fontWeight: 'bold';
+  };
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+const styles = StyleSheet.create<Styles>({
+  container: {
+    flex: 1,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    padding: 20,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  logo: {
+    width: 150, // Adjust size as needed
+    height: 150, // Adjust size as needed
+    marginBottom: 20,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  name: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 10,
+  },
+  title: {
+    fontSize: 18,
+    marginBottom: 20,
+    color: '#555',
+  },
+  welcomeMessage: {
+    fontSize: 18,
+    marginVertical: 20,
+    textAlign: 'center',
+  },
+  contactInfo: {
+    fontSize: 16,
+    marginVertical: 5,
+    color: '#333',
+  },
+  buttonContainer: {
+    marginTop: 30,
+  },
+  button: {
+    backgroundColor: '#007BFF',
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 5,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
+
+export default function Homepage(): ReactElement {
+  // Placeholder for employee name - this would likely come from user authentication context
+  const employeeName = 'Employee Name';
+  const router = useRouter();
+
+  const handleMySchedule = () => {
+    // Navigate to My Schedule screen
+    router.push('/MySchedule');
+  };
+
+  const handleCurrentJob = () => {
+    // Navigate to Current Job details screen
+    router.push('/(tabs)/CurrentJobs');
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.name}>WASHINGTON MURRAY</Text>
+      <Text style={styles.title}>V.P. OPERATIONS</Text>
+
+      <Text style={styles.welcomeMessage}>Welcome, {employeeName}!</Text>
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.button} onPress={handleMySchedule}>
+          <Text style={styles.buttonText}>My Schedule</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={handleCurrentJob}>
+          <Text style={styles.buttonText}>Current Job</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Image
+        style={styles.logo}
+        source={require('../../assets/images/logo.png')} 
+      />
+    </View>
+  );
+}
