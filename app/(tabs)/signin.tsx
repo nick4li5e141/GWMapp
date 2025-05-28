@@ -1,20 +1,10 @@
 import { Box, Button, Center, GluestackUIProvider, Heading, Input, InputField, Text } from '@gluestack-ui/themed';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert } from 'react-native';
 
-type RootStackParamList = {
-  Signin: undefined;
-  // Add other screens as needed
-};
-
-type SigninScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Signin'>;
-
-interface SigninProps {
-  navigation: SigninScreenNavigationProp;
-}
-
-export default function Signin({ navigation }: SigninProps): JSX.Element {
+export default function Signin(): JSX.Element {
+  const router = useRouter();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
@@ -103,17 +93,15 @@ export default function Signin({ navigation }: SigninProps): JSX.Element {
             textAlign: 'center'
           }}>
             Don't have an account?{' '}
-            {/* TODO: Uncomment when signup page is created
             <Text 
               style={{ color: '#0ea5e9', textDecorationLine: 'underline' }}
-              onPress={() => navigation.navigate('Signup')}
+              onPress={() => router.push('/signup')}
             >
               Sign Up
             </Text>
-            */}
           </Text>
         </Center>
       </Box>
     </GluestackUIProvider>
   );
-}
+} 
