@@ -1,6 +1,6 @@
 import { Checkbox, CheckboxIndicator } from '@gluestack-ui/themed';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View, Button, Alert } from 'react-native'; // ✅ Added Button and Alert
 
 interface Job {
   id: string;
@@ -48,7 +48,6 @@ const currentJobs: Job[] = [
     ],
     description: ''
   },
-  // Add more jobs as needed
 ];
 
 const CurrentJobs = () => {
@@ -74,6 +73,12 @@ const CurrentJobs = () => {
     ));
   };
 
+  // ✅ New submit handler
+  const handleSubmit = () => {
+    console.log('Submitted Jobs:', jobs);
+    Alert.alert('Submitted', 'Your updates have been submitted successfully!');
+  };
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.header}>Current Jobs</Text>
@@ -83,8 +88,7 @@ const CurrentJobs = () => {
           <Text style={styles.jobLocation}>{job.location}</Text>
           <Text style={styles.jobTime}>{job.time}</Text>
           <Text style={styles.jobTasks}>Tasks: {job.tasks}</Text>
-          
-          {/* Task Checklist */}
+
           <View style={styles.taskList}>
             <Text style={styles.taskListTitle}>Task Checklist:</Text>
             {job.taskList.map(task => (
@@ -109,7 +113,6 @@ const CurrentJobs = () => {
             ))}
           </View>
 
-          {/* Description Box */}
           <View style={styles.descriptionBox}>
             <Text style={styles.descriptionTitle}>Additional Notes:</Text>
             <TextInput
@@ -123,6 +126,11 @@ const CurrentJobs = () => {
           </View>
         </View>
       ))}
+
+      {/* ✅ Added submit button at the end */}
+      <View style={{ marginVertical: 20, paddingHorizontal: 20 }}>
+        <Button title="Submit" onPress={handleSubmit} color="#10b981" />
+      </View>
     </ScrollView>
   );
 };
@@ -233,4 +241,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CurrentJobs; 
+export default CurrentJobs;
