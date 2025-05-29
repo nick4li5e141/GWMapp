@@ -106,13 +106,11 @@ export default function Homepage(): ReactElement {
   const router = useRouter();
 
   const handleMySchedule = () => {
-    // Navigate to My Schedule screen
-    router.push('/MySchedule');
+    router.push('/pages/MySchedule');
   };
 
   const handleCurrentJob = () => {
-    // Navigate to Current Job details screen
-    router.push('/(tabs)/CurrentJobs');
+    router.push('/pages/CurrentJobs');
   };
 
   return (
