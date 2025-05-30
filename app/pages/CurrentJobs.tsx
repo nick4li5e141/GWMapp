@@ -1,6 +1,15 @@
 import { Checkbox, CheckboxIndicator } from '@gluestack-ui/themed';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View, Button, Alert } from 'react-native'; // ✅ Added Button and Alert
+import {
+  Alert,
+  Button,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from 'react-native';
+import * as Location from 'expo-location';
 
 interface Job {
   id: string;
@@ -47,7 +56,7 @@ const currentJobs: Job[] = [
       { id: '4', label: 'Wipe down blinds', completed: false }
     ],
     description: ''
-  },
+  }
 ];
 
 const CurrentJobs = () => {
@@ -73,10 +82,26 @@ const CurrentJobs = () => {
     ));
   };
 
-  // ✅ New submit handler
   const handleSubmit = () => {
     console.log('Submitted Jobs:', jobs);
     Alert.alert('Submitted', 'Your updates have been submitted successfully!');
+  };
+
+  const handlePinLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required to pin your location.');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+      Alert.alert('Location Pinned', `Latitude: ${latitude.toFixed(6)}\nLongitude: ${longitude.toFixed(6)}`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to get location.');
+      console.error(error);
+    }
   };
 
   return (
@@ -127,7 +152,10 @@ const CurrentJobs = () => {
         </View>
       ))}
 
-      {/* ✅ Added submit button at the end */}
+      <View style={{ marginVertical: 10, paddingHorizontal: 20 }}>
+        <Button title="PIN Location" onPress={handlePinLocation} color="#3b82f6" />
+      </View>
+
       <View style={{ marginVertical: 20, paddingHorizontal: 20 }}>
         <Button title="Submit" onPress={handleSubmit} color="#10b981" />
       </View>

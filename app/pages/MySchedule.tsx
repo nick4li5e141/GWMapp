@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 
 interface MarkedDate {
@@ -12,6 +15,7 @@ interface MarkedDate {
   textColor?: string;
   disableTouchEvent?: boolean;
   status?: 'unavailable' | 'pending' | 'available';
+  hours?: number;
 }
 
 interface MarkedDates {
@@ -22,12 +26,16 @@ const MySchedule = () => {
   const [showHolidays, setShowHolidays] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedHolidays, setSelectedHolidays] = useState<MarkedDates>({});
+  const [hourlyRate, setHourlyRate] = useState(20); // Example hourly rate
+  const [loading, setLoading] = useState(true); // Add loading state
+  const [isSubmitting, setIsSubmitting] = useState(false); // Add submission state
+  const router = useRouter();
 
   const markedDates: MarkedDates = {
-    '2023-10-25': { selected: true, marked: true, selectedColor: '#00adf5' },
-    '2023-10-26': { marked: true },
-    '2023-10-27': { marked: true, dotColor: 'red', activeOpacity: 0 },
-    '2023-10-28': { disabled: true, disableTouchEvent: true }
+    '2023-10-25': { selected: true, marked: true, selectedColor: '#00adf5', hours: 8 },
+    '2023-10-26': { marked: true, hours: 7 },
+    '2023-10-27': { marked: true, dotColor: 'red', activeOpacity: 0, hours: 0 },
+    '2023-10-28': { disabled: true, disableTouchEvent: true, hours: 0 }
   };
 
   const holidayDates: MarkedDates = {
@@ -94,6 +102,97 @@ const MySchedule = () => {
 
   const selectedHolidaysList = Object.keys(selectedHolidays);
 
+  // Function to calculate total working hours for a given month
+  const calculateTotalWorkingHoursForMonth = (dates: MarkedDates, monthYear: string): number => {
+    let totalHours = 0;
+    const [year, month] = monthYear.split('-');
+
+    Object.keys(dates).forEach(date => {
+      const [dateYear, dateMonth] = date.split('-');
+      // Check if the date is in the target month and is not disabled
+      if (dateYear === year && dateMonth === month && !dates[date]?.disabled) {
+        // Use the hours property if available, otherwise assume a default (or 0)
+        totalHours += dates[date]?.hours || 0; 
+      }
+    });
+    return totalHours;
+  };
+
+  const currentMonthYear = '2023-10'; // Example: calculate for October 2023
+  const totalScheduledHours = calculateTotalWorkingHoursForMonth(markedDates, currentMonthYear);
+
+  // Function to save scheduled hours to Firestore
+  const saveScheduledHours = async (userId: string, monthYear: string, hours: number) => {
+    try {
+      await firestore()
+        .collection('users') // Assuming you have a 'users' collection
+        .doc(userId) // Use the user's UID as the document ID
+        .collection('scheduledHours') // Subcollection for scheduled hours
+        .doc(monthYear) // Document for the specific month/year (e.g., '2023-10')
+        .set({ totalHours: hours, lastUpdated: firestore.FieldValue.serverTimestamp() });
+
+      console.log('Scheduled hours saved successfully for', monthYear);
+    } catch (error) {
+      console.error('Error saving scheduled hours:', error);
+      // Optionally show an alert to the user
+      // Alert.alert('Error', 'Failed to save schedule');
+    }
+  };
+
+  // Use useEffect to save hours when they are calculated (or when component mounts/updates)
+  useEffect(() => {
+    const currentUser = (auth() as any).currentUser; // Bypass TypeScript error
+    if (currentUser) {
+      saveScheduledHours(currentUser.uid, currentMonthYear, totalScheduledHours);
+    }
+    setLoading(false); // Set loading to false after initial load/save attempt
+  }, [totalScheduledHours, currentMonthYear]); // Depend on these values
+
+  // Handler for the submit button
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      const currentUser = (auth() as any).currentUser;
+      if (!currentUser) {
+        Alert.alert('Error', 'No user logged in');
+        return;
+      }
+
+      // Calculate total hours for the current month
+      const totalHours = calculateTotalWorkingHoursForMonth(markedDates, currentMonthYear);
+
+      // Save to Firestore
+      await firestore()
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('scheduledHours')
+        .doc(currentMonthYear)
+        .set({
+          totalHours: totalHours,
+          lastUpdated: firestore.FieldValue.serverTimestamp(),
+          status: 'submitted'
+        });
+
+      // Navigate directly to payroll page
+      router.push('/(tabs)/payroll');
+      
+    } catch (error) {
+      console.error('Error submitting hours:', error);
+      Alert.alert('Error', 'Failed to submit hours. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    // Optional: Render a loading indicator while fetching/saving
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading Schedule...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>My Schedule</Text>
@@ -146,8 +245,22 @@ const MySchedule = () => {
           <View style={styles.workingDaysContainer}>
             <Text style={styles.workingDaysTitle}>Days You're Scheduled to Work:</Text>
             {workingDatesList.map(date => (
-              <Text key={date} style={styles.workingDayText}>• {date}</Text>
+              <Text key={date} style={styles.workingDayText}>• {date} - {markedDates[date]?.hours || 0} hours</Text>
             ))}
+            <Text style={styles.totalHoursText}>Total Scheduled Hours ({currentMonthYear}): {totalScheduledHours}</Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.submitButton,
+                pressed && styles.submitButtonPressed,
+                isSubmitting && styles.submitButtonSubmitting
+              ]}
+              onPress={handleSubmit}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.submitButtonText}>
+                {isSubmitting ? 'Submitting...' : 'Submit Hours & View Payroll'}
+              </Text>
+            </Pressable>
           </View>
         )}
 
@@ -278,7 +391,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
-  }
+  },
+  totalHoursText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 10,
+    color: '#333',
+    marginBottom: 10,
+  },
+  submitButton: {
+    backgroundColor: '#10b981',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  submitButtonPressed: {
+    backgroundColor: '#2196F3',
+  },
+  submitButtonSubmitting: {
+    backgroundColor: '#94a3b8',
+    opacity: 0.7,
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
 
 export default MySchedule;

@@ -1,197 +1,185 @@
-import { Box, GluestackUIProvider, Heading, HStack, ScrollView, Text, VStack } from '@gluestack-ui/themed';
+import {
+  Box,
+  GluestackUIProvider,
+  Heading,
+  HStack,
+  Pressable,
+  ScrollView,
+  Text,
+  VStack,
+} from '@gluestack-ui/themed';
 import React from 'react';
+import { Alert, StyleSheet } from 'react-native';
 
 interface PayrollDetails {
-  currentMonth: string;
-  baseSalary: number;
-  overtime: number;
-  bonuses: number;
-  deductions: {
-    tax: number;
-    insurance: number;
-    other: number;
-  };
+  hoursWorked: number;
+  hourlyRate: number;
+  grossSalary: number;
+  cpp: number;
+  ei: number;
+  incomeTax: number;
   netSalary: number;
   paymentDate: string;
   paymentStatus: 'Pending' | 'Paid';
 }
 
-export default function Payroll(): JSX.Element {
-  // TODO: Implement actual payroll calculations
-  // Example calculation structure:
-  // 1. Calculate gross salary
-  //    grossSalary = baseSalary + overtime + bonuses
-  //
-  // 2. Calculate deductions
-  //    - Tax calculation (e.g., progressive tax brackets)
-  //    - Insurance (e.g., health insurance, retirement)
-  //    - Other deductions (e.g., union fees, benefits)
-  //
-  // 3. Calculate net salary
-  //    netSalary = grossSalary - totalDeductions
-  //
-  // 4. Additional considerations:
-  //    - Overtime rate multipliers
-  //    - Holiday pay
-  //    - Performance bonuses
-  //    - Tax credits
-  //    - Social security contributions
-  //    - Pension contributions
+// Example data
+const examplePayroll: PayrollDetails = {
+  hoursWorked: 160,
+  hourlyRate: 17.20,
+  grossSalary: 2752.0,
+  cpp: 163.74,
+  ei: 45.68,
+  incomeTax: 275.2,
+  netSalary: 2267.38,
+  paymentDate: 'May 31, 2024',
+  paymentStatus: 'Paid',
+};
 
-  // Mock data - in real app, this would come from your backend
-  const payrollDetails: PayrollDetails = {
-    currentMonth: 'March 2024',
-    baseSalary: 5000,
-    overtime: 200,
-    bonuses: 300,
-    deductions: {
-      tax: 800,
-      insurance: 200,
-      other: 100
-    },
-    netSalary: 4400,
-    paymentDate: 'March 31, 2024',
-    paymentStatus: 'Pending'
+export default function Payroll(): JSX.Element {
+  const handlePrint = () => {
+    Alert.alert('Print Payroll', 'Would you like to print this payroll information?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Print',
+        onPress: () => {
+          Alert.alert('Success', 'Printing started...');
+        },
+      },
+    ]);
   };
 
-  const totalDeductions = 
-    payrollDetails.deductions.tax + 
-    payrollDetails.deductions.insurance + 
-    payrollDetails.deductions.other;
+  const totalDeductions = examplePayroll.cpp + examplePayroll.ei + examplePayroll.incomeTax;
 
   return (
     <GluestackUIProvider>
-      <Box style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <Box style={styles.mainContainer}>
         <ScrollView>
           <VStack style={{ padding: 20, gap: 16 }}>
-            <Heading style={{ color: '#334155', textAlign: 'center' }}>
-              My Payroll
-            </Heading>
+            <Heading style={{ color: '#334155', textAlign: 'center' }}>Payroll Summary</Heading>
 
-            {/* Current Month Summary */}
-            <Box style={{ 
-              backgroundColor: 'white',
-              borderRadius: 8,
-              padding: 16,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.1,
-              shadowRadius: 2,
-              elevation: 2
-            }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
-                {payrollDetails.currentMonth}
+            <Box style={styles.card}>
+              <Text style={styles.cardTitle}>Pay Period Summary</Text>
+              <Text style={styles.cardText}>Hours Worked: {examplePayroll.hoursWorked}</Text>
+              <Text style={styles.cardText}>Hourly Rate: ${examplePayroll.hourlyRate}</Text>
+              <Text style={styles.cardText}>Gross Salary: ${examplePayroll.grossSalary.toFixed(2)}</Text>
+              <Text
+                style={[
+                  styles.cardText,
+                  {
+                    color: examplePayroll.paymentStatus === 'Paid' ? '#10b981' : '#f59e0b',
+                  },
+                ]}
+              >
+                Status: {examplePayroll.paymentStatus}
               </Text>
-              <HStack style={{ justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ color: '#64748b' }}>Status:</Text>
-                <Text style={{ 
-                  color: payrollDetails.paymentStatus === 'Paid' ? '#10b981' : '#f59e0b',
-                  fontWeight: 'bold'
-                }}>
-                  {payrollDetails.paymentStatus}
-                </Text>
-              </HStack>
-              <HStack style={{ justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ color: '#64748b' }}>Payment Date:</Text>
-                <Text>{payrollDetails.paymentDate}</Text>
-              </HStack>
+              <Text style={styles.cardText}>Payment Date: {examplePayroll.paymentDate}</Text>
             </Box>
 
-            {/* Salary Breakdown */}
-            <Box style={{ 
-              backgroundColor: 'white',
-              borderRadius: 8,
-              padding: 16,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.1,
-              shadowRadius: 2,
-              elevation: 2
-            }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>
-                Salary Breakdown
-              </Text>
-
+            <Box style={styles.card}>
+              <Text style={styles.cardTitle}>Deductions</Text>
               <VStack style={{ gap: 8 }}>
-                <HStack style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#64748b' }}>Base Salary</Text>
-                  <Text>${payrollDetails.baseSalary}</Text>
+                <HStack style={styles.row}>
+                  <Text style={styles.cardText}>CPP (5.95%)</Text>
+                  <Text style={styles.cardText}>${examplePayroll.cpp.toFixed(2)}</Text>
                 </HStack>
-                <HStack style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#64748b' }}>Overtime</Text>
-                  <Text>${payrollDetails.overtime}</Text>
+                <HStack style={styles.row}>
+                  <Text style={styles.cardText}>EI (1.66%)</Text>
+                  <Text style={styles.cardText}>${examplePayroll.ei.toFixed(2)}</Text>
                 </HStack>
-                <HStack style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#64748b' }}>Bonuses</Text>
-                  <Text>${payrollDetails.bonuses}</Text>
+                <HStack style={styles.row}>
+                  <Text style={styles.cardText}>Income Tax (~10%)</Text>
+                  <Text style={styles.cardText}>${examplePayroll.incomeTax.toFixed(2)}</Text>
                 </HStack>
-                <HStack style={{ justifyContent: 'space-between', marginTop: 8 }}>
-                  <Text style={{ fontWeight: 'bold' }}>Gross Salary</Text>
-                  <Text style={{ fontWeight: 'bold' }}>
-                    ${payrollDetails.baseSalary + payrollDetails.overtime + payrollDetails.bonuses}
-                  </Text>
+                <HStack style={[styles.row, { marginTop: 8 }]}>
+                  <Text style={[styles.cardText, styles.boldText]}>Total Deductions</Text>
+                  <Text style={[styles.cardText, styles.boldText]}>{`$${totalDeductions.toFixed(2)}`}</Text>
                 </HStack>
               </VStack>
             </Box>
 
-            {/* Deductions */}
-            <Box style={{ 
-              backgroundColor: 'white',
-              borderRadius: 8,
-              padding: 16,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.1,
-              shadowRadius: 2,
-              elevation: 2
-            }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>
-                Deductions
-              </Text>
+            <Pressable
+              style={({ pressed }) => [styles.payrollPrintButton, pressed && styles.payrollPrintButtonPressed]}
+              onPress={handlePrint}
+            >
+              <Text style={styles.payrollPrintButtonText}>Print Payroll</Text>
+            </Pressable>
 
-              <VStack style={{ gap: 8 }}>
-                <HStack style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#64748b' }}>Tax</Text>
-                  <Text>${payrollDetails.deductions.tax}</Text>
-                </HStack>
-                <HStack style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#64748b' }}>Insurance</Text>
-                  <Text>${payrollDetails.deductions.insurance}</Text>
-                </HStack>
-                <HStack style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#64748b' }}>Other</Text>
-                  <Text>${payrollDetails.deductions.other}</Text>
-                </HStack>
-                <HStack style={{ justifyContent: 'space-between', marginTop: 8 }}>
-                  <Text style={{ fontWeight: 'bold' }}>Total Deductions</Text>
-                  <Text style={{ fontWeight: 'bold' }}>${totalDeductions}</Text>
-                </HStack>
-              </VStack>
-            </Box>
-
-            {/* Net Salary */}
-            <Box style={{ 
-              backgroundColor: '#0ea5e9',
-              borderRadius: 8,
-              padding: 16,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.1,
-              shadowRadius: 2,
-              elevation: 2
-            }}>
-              <HStack style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
-                  Net Salary
-                </Text>
-                <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>
-                  ${payrollDetails.netSalary}
+            <Box style={[styles.card, styles.netSalaryBox]}>
+              <HStack style={styles.row}>
+                <Text style={[styles.cardTitle, styles.whiteText]}>Net Salary</Text>
+                <Text style={[styles.netSalaryText, styles.whiteText]}>
+                  ${examplePayroll.netSalary.toFixed(2)}
                 </Text>
               </HStack>
             </Box>
+
+            
           </VStack>
         </ScrollView>
       </Box>
     </GluestackUIProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#334155',
+  },
+  cardText: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  row: {
+    justifyContent: 'space-between',
+  },
+  boldText: {
+    fontWeight: 'bold',
+  },
+  netSalaryBox: {
+    backgroundColor: '#0ea5e9',
+  },
+  netSalaryText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  whiteText: {
+    color: 'white',
+  },
+  payrollPrintButton: {
+    backgroundColor: ' #3390ff',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  payrollPrintButtonPressed: {
+    backgroundColor: ' #3390ff ',
+  },
+  payrollPrintButtonText: {
+    color: '#ff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});
