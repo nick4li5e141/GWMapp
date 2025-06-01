@@ -173,7 +173,7 @@ const MySchedule = () => {
           status: 'submitted'
         });
 
-      // Navigate directly to payroll page
+      // Navigate to payroll page after submitting
       router.push('/(tabs)/payroll');
       
     } catch (error) {

@@ -1,4 +1,6 @@
 import { Box, Button, Center, GluestackUIProvider, Heading, Input, InputField, Text } from '@gluestack-ui/themed';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert } from 'react-native';
@@ -31,8 +33,17 @@ export default function Signup(): JSX.Element {
         Alert.alert('Error', 'Password must be at least 6 characters long');
         return;
       }
-      // TODO: Implement actual sign up logic
-      console.log('Sign up:', { name, phoneNumber, email, address, password });
+      // Create user in Firebase Auth
+      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+      const user = userCredential.user;
+      // Save additional info to Firestore
+      await firestore().collection('users').doc(user.uid).set({
+        name,
+        phoneNumber,
+        email,
+        address,
+        createdAt: new Date().toISOString(),
+      });
       Alert.alert('Success', 'Account created successfully');
       router.push('/signin');
     } catch (error) {
@@ -63,7 +74,7 @@ export default function Signup(): JSX.Element {
             <>
               <Input style={styles.input}>
                 <InputField 
-                  defaultValue={name} 
+                  value={name} 
                   onChangeText={setName} 
                   placeholder="Full Name" 
                   autoCapitalize="words"
@@ -72,7 +83,7 @@ export default function Signup(): JSX.Element {
 
               <Input style={styles.input}>
                 <InputField 
-                  defaultValue={phoneNumber} 
+                  value={phoneNumber} 
                   onChangeText={setPhoneNumber} 
                   placeholder="Phone Number" 
                   keyboardType="phone-pad"
@@ -81,7 +92,7 @@ export default function Signup(): JSX.Element {
 
               <Input style={styles.input}>
                 <InputField 
-                  defaultValue={email} 
+                  value={email} 
                   onChangeText={setEmail} 
                   placeholder="Email Address" 
                   keyboardType="email-address"
@@ -91,7 +102,7 @@ export default function Signup(): JSX.Element {
 
               <Input style={[styles.input, { marginBottom: 24 }]}>
                 <InputField 
-                  defaultValue={address} 
+                  value={address} 
                   onChangeText={setAddress} 
                   placeholder="Home Address" 
                   autoCapitalize="words"
@@ -109,7 +120,7 @@ export default function Signup(): JSX.Element {
             <>
               <Input style={styles.input}>
                 <InputField 
-                  defaultValue={password} 
+                  value={password} 
                   onChangeText={setPassword} 
                   placeholder="Create Password" 
                   secureTextEntry
@@ -118,7 +129,7 @@ export default function Signup(): JSX.Element {
 
               <Input style={[styles.input, { marginBottom: 24 }]}>
                 <InputField 
-                  defaultValue={confirmPassword} 
+                  value={confirmPassword} 
                   onChangeText={setConfirmPassword} 
                   placeholder="Confirm Password" 
                   secureTextEntry
