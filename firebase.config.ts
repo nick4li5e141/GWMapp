@@ -1,4 +1,6 @@
 import firebase from '@react-native-firebase/app';
+import { FirebaseApp, initializeApp } from 'firebase/app';
+import { Platform } from 'react-native';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCbF7KS5N4IbmXTHDyaHaqdPhMhSz-qa34',
@@ -11,8 +13,13 @@ const firebaseConfig = {
   // Add other config options as needed
 };
 
-// Initialize Firebase
-const app = firebase.initializeApp(firebaseConfig);
+// Initialize Firebase based on platform
+let app: FirebaseApp | firebase.app.App;
+if (Platform.OS === 'web') {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = firebase.initializeApp(firebaseConfig);
+}
 
 export { app, firebaseConfig };
 

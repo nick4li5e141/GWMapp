@@ -1,24 +1,136 @@
 import { Box, Button, Center, GluestackUIProvider, Heading, Input, InputField, Text } from '@gluestack-ui/themed';
+import firestore from '@react-native-firebase/firestore';
 import { useRouter } from 'expo-router';
+import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import React, { useState } from 'react';
-import { Alert } from 'react-native';
+import { Platform } from 'react-native';
+import { app } from '../../firebase.config';
+
+interface UserData {
+  address: string;
+  email: string;
+  name: string;
+  password: string;
+  phoneNumber: string;
+}
 
 export default function Signin(): JSX.Element {
   const router = useRouter();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
   const handleSignIn = async (): Promise<void> => {
-    try {
-      // TODO: Implement actual sign in logic
-      console.log('Sign in:', { email, password });
-      Alert.alert('Success', 'Signed in successfully');
-      // Navigate to the tabs route (home page) after successful sign-in
-      router.replace('/(tabs)');
-    } catch (error) {
-      console.error('Error signing in:', error);
-      Alert.alert('Error', 'Failed to sign in');
+    if (!validateForm()) {
+      return;
     }
+
+    try {
+      setLoading(true);
+      setErrors({}); // Clear any previous errors
+      let userData: UserData | null = null;
+
+      if (Platform.OS === 'web') {
+        const db = getFirestore(app);
+        
+        try {
+          const userDoc = await getDoc(doc(db, 'gwm', 'user_001'));
+          
+          if (!userDoc.exists()) {
+            setErrors({ general: 'No account found with this email' });
+            return;
+          }
+
+          userData = userDoc.data() as UserData;
+          
+          if (userData.email !== email) {
+            setErrors({ general: 'No account found with this email' });
+            return;
+          }
+          
+          if (userData.password !== password) {
+            setErrors({ password: 'Incorrect password' });
+            return;
+          }
+        } catch (error) {
+          setErrors({ general: 'Failed to sign in. Please try again.' });
+          return;
+        }
+      } else {
+        try {
+          const userDoc = await firestore()
+            .collection('gwm')
+            .doc('user_001')
+            .get();
+
+          if (!userDoc.exists) {
+            setErrors({ general: 'No account found with this email' });
+            return;
+          }
+
+          userData = userDoc.data() as UserData;
+          
+          if (userData.email !== email) {
+            setErrors({ general: 'No account found with this email' });
+            return;
+          }
+          
+          if (userData.password !== password) {
+            setErrors({ password: 'Incorrect password' });
+            return;
+          }
+        } catch (error) {
+          setErrors({ general: 'Failed to sign in. Please try again.' });
+          return;
+        }
+      }
+
+      // Navigate to tabs
+      router.push('/(tabs)');
+      
+    } catch (error: any) {
+      setErrors({ general: 'Failed to sign in. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      // Clear any stored user data or session
+      setEmail('');
+      setPassword('');
+      setErrors({});
+      // Navigate back to sign in
+      router.replace('/signin');
+    } catch (error) {
+      setErrors({ general: 'Failed to sign out. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: { email?: string; password?: string } = {};
+    
+    // Email validation
+    if (!email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Password validation
+    if (!password) {
+      newErrors.password = 'Password is required';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   return (
@@ -36,11 +148,26 @@ export default function Signin(): JSX.Element {
             color: '#334155',
             textAlign: 'center'
           }}>
-            Sign In
+            <Text>Sign In</Text>
           </Heading>
 
+          {errors.general && (
+            <Text style={{ 
+              color: '#ef4444', 
+              fontSize: 14, 
+              marginBottom: 16, 
+              textAlign: 'center',
+              backgroundColor: '#fee2e2',
+              padding: 12,
+              borderRadius: 8,
+              width: '100%'
+            }}>
+              {errors.general}
+            </Text>
+          )}
+
           <Input style={{ 
-            marginBottom: 16, 
+            marginBottom: 8, 
             width: '100%',
             backgroundColor: 'white',
             borderRadius: 8,
@@ -48,19 +175,28 @@ export default function Signin(): JSX.Element {
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.1,
             shadowRadius: 2,
-            elevation: 2
+            elevation: 2,
+            borderColor: errors.email ? '#ef4444' : 'transparent'
           }}>
             <InputField 
-              defaultValue={email} 
-              onChangeText={setEmail} 
+              value={email} 
+              onChangeText={(text) => {
+                setEmail(text);
+                setErrors(prev => ({ ...prev, email: undefined, general: undefined }));
+              }}
               placeholder="Email" 
               keyboardType="email-address"
               autoCapitalize="none"
             />
           </Input>
-          
+          {errors.email && (
+            <Text style={{ color: '#ef4444', fontSize: 12, marginBottom: 16, alignSelf: 'flex-start' }}>
+              {errors.email}
+            </Text>
+          )}
+
           <Input style={{ 
-            marginBottom: 24, 
+            marginBottom: 8, 
             width: '100%',
             backgroundColor: 'white',
             borderRadius: 8,
@@ -68,40 +204,56 @@ export default function Signin(): JSX.Element {
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.1,
             shadowRadius: 2,
-            elevation: 2
+            elevation: 2,
+            borderColor: errors.password ? '#ef4444' : 'transparent'
           }}>
             <InputField 
-              defaultValue={password} 
-              onChangeText={setPassword} 
+              value={password} 
+              onChangeText={(text) => {
+                setPassword(text);
+                setErrors(prev => ({ ...prev, password: undefined, general: undefined }));
+              }}
               placeholder="Password" 
               secureTextEntry
             />
           </Input>
+          {errors.password && (
+            <Text style={{ color: '#ef4444', fontSize: 12, marginBottom: 16, alignSelf: 'flex-start' }}>
+              {errors.password}
+            </Text>
+          )}
 
           <Button 
             style={{ 
               width: '100%', 
               marginBottom: 16,
               backgroundColor: '#0ea5e9',
-              borderRadius: 8
+              borderRadius: 8,
+              opacity: loading ? 0.7 : 1
             }}
             onPress={handleSignIn}
+            isDisabled={loading}
           >
-            Sign In
+            <Text style={{ color: 'white' }}>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Text>
           </Button>
 
-          <Text style={{ 
-            color: '#64748b',
-            textAlign: 'center'
-          }}>
-            Don't have an account?{' '}
-            <Text 
-              style={{ color: '#0ea5e9', textDecorationLine: 'underline' }}
-              onPress={() => router.push('/pages/signup')}
-            >
-              Sign Up
+          <Button 
+            style={{ 
+              width: '100%', 
+              marginBottom: 16,
+              backgroundColor: '#ef4444',
+              borderRadius: 8,
+              opacity: loading ? 0.7 : 1
+            }}
+            onPress={handleSignOut}
+            isDisabled={loading}
+          >
+            <Text style={{ color: 'white' }}>
+              Sign Out
             </Text>
-          </Text>
+          </Button>
         </Center>
       </Box>
     </GluestackUIProvider>
