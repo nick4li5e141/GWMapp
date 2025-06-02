@@ -1,7 +1,14 @@
 // Import necessary modules and hooks
-import { useRouter } from 'expo-router'; // For navigation between pages
-import React, { ReactElement } from 'react'; // React types and functions
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'; // Core UI components
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import React, { ReactElement, useEffect, useState } from 'react';
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+interface SessionData {
+  email: string;
+  name: string;
+  isAuthenticated: boolean;
+}
 
 // Define styles with explicit types for better TypeScript support
 interface Styles {
@@ -20,6 +27,17 @@ interface Styles {
     alignItems: 'center';
   };
   buttonText: { color: string; fontSize: number; fontWeight: 'bold' };
+  signOutButton: {
+    backgroundColor: string;
+    padding: number;
+    borderRadius: number;
+    marginVertical: number;
+    alignItems: 'center';
+    position: 'absolute';
+    top: number;
+    right: number;
+    boxShadow: string;
+  };
 }
 
 // Define the stylesheet for the component
@@ -77,39 +95,133 @@ const styles = StyleSheet.create<Styles>({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  signOutButton: {
+    backgroundColor: '#ef4444',
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 5,
+    alignItems: 'center',
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+  },
 });
 
 // Define the functional component
 export default function Homepage(): ReactElement {
-  const employeeName = 'Employee Name'; // Hardcoded employee name (can be dynamic)
-  const router = useRouter(); // Router hook for navigation
+  const router = useRouter();
+  const [userName, setUserName] = useState<string>('Employee Name');
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const sessionData = await AsyncStorage.getItem('userSession');
+        if (!sessionData) {
+          router.replace('/');
+          return;
+        }
+        const session: SessionData = JSON.parse(sessionData);
+        if (!session.isAuthenticated) {
+          router.replace('/');
+          return;
+        }
+        setUserName(session.name);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        router.replace('/');
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true);
+      console.log('Starting sign out process...');
+      
+      // Clear ALL storage data to ensure complete sign out
+      await AsyncStorage.clear();
+      console.log('All storage cleared');
+      
+      // Verify session is cleared
+      const sessionData = await AsyncStorage.getItem('userSession');
+      if (sessionData) {
+        console.error('Session still exists after clear!');
+        // Force clear again
+        await AsyncStorage.clear();
+      }
+      
+      // Force a small delay to ensure AsyncStorage operations are complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      console.log('Navigating to sign in page...');
+      // Navigate to the root signin page
+      router.replace('/');
+      
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      Alert.alert(
+        'Sign Out Error',
+        'Failed to sign out properly. Please try again.',
+        [
+          {
+            text: 'OK',
+            onPress: async () => {
+              try {
+                await AsyncStorage.clear();
+                router.replace('/');
+              } catch (e) {
+                console.error('Failed to force clear session:', e);
+              }
+            }
+          }
+        ]
+      );
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   // Navigation handlers for each button
   const handleMySchedule = () => {
-    router.push('/pages/MySchedule'); // Navigate to MySchedule page
+    router.push('/pages/MySchedule');
   };
 
   const handleCurrentJob = () => {
-    router.push('/pages/CurrentJobs'); // Navigate to CurrentJobs page
+    router.push('/pages/CurrentJobs');
   };
 
   const handleBenefit = () => {
-    router.push('/pages/Benefit'); // Navigate to Benefit page
+    router.push('/pages/Benefit');
   };
 
   const handleMaintenance = () => {
-    router.push('/pages/Maintenance'); // Navigate to Maintenance page
+    router.push('/pages/Maintenance');
   };
 
-  // Return the UI
   return (
     <View style={styles.container}>
+      {/* Sign Out Button */}
+      <TouchableOpacity 
+        style={[styles.signOutButton, isSigningOut && { opacity: 0.7 }]} 
+        onPress={handleSignOut}
+        disabled={isSigningOut}
+      >
+        <Text style={styles.buttonText}>
+          {isSigningOut ? 'Signing out...' : 'Sign Out'}
+        </Text>
+      </TouchableOpacity>
+
       {/* Header Info */}
       <Text style={styles.name}>WASHINGTON MURRAY</Text>
       <Text style={styles.title}>V.P. OPERATIONS</Text>
 
       {/* Welcome message */}
-      <Text style={styles.welcomeMessage}>Welcome, {employeeName}!</Text>
+      <Text style={styles.welcomeMessage}>Welcome, {userName}!</Text>
 
       {/* Button Group */}
       <View style={styles.buttonContainer}>
@@ -133,7 +245,7 @@ export default function Homepage(): ReactElement {
       {/* Company Logo */}
       <Image
         style={styles.logo}
-        source={require('../../assets/images/logo.png')} // Make sure this path is correct
+        source={require('../../assets/images/logo.png')}
       />
     </View>
   );

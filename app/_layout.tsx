@@ -1,63 +1,87 @@
 import { GluestackUIProvider } from '@gluestack-ui/themed';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import 'react-native-reanimated';
-import '../firebase.config';
+import { useEffect, useState } from 'react';
+import { useColorScheme } from 'react-native';
+import { config } from './gluestack-ui.config';
 
-import { useColorScheme } from '../hooks/useColorScheme';
-
-// Create an Authentication Context
-const AuthContext = createContext<{ isAuthenticated: boolean; signIn: () => void; signOut: () => void } | null>(null);
-
-// Custom hook to use the AuthContext
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-
-function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    const checkAuthStatus = async () => {
-      setIsAuthenticated(false);
-    };
-    checkAuthStatus();
-  }, []);
-
-  const signIn = () => {
-    setIsAuthenticated(true);
-  };
-
-  const signOut = () => {
-    setIsAuthenticated(false);
-  };
-
-  return (
-    <AuthContext.Provider value={{ isAuthenticated, signIn, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  );
+interface SessionData {
+  email: string;
+  name: string;
+  isAuthenticated: boolean;
 }
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const sessionData = await AsyncStorage.getItem('userSession');
+        if (sessionData) {
+          const session: SessionData = JSON.parse(sessionData);
+          setIsAuthenticated(session.isAuthenticated);
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  // Listen for storage changes
+  useEffect(() => {
+    const checkStorage = async () => {
+      const sessionData = await AsyncStorage.getItem('userSession');
+      if (sessionData) {
+        const session: SessionData = JSON.parse(sessionData);
+        setIsAuthenticated(session.isAuthenticated);
+      } else {
+        setIsAuthenticated(false);
+      }
+    };
+
+    const interval = setInterval(checkStorage, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (isAuthenticated === null) {
+    return null;
+  }
 
   return (
-    <GluestackUIProvider>
+    <GluestackUIProvider config={config}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <AuthProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-        </AuthProvider>
-        <StatusBar style="auto" />
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+          }}
+        >
+          <Stack.Screen
+            name="index"
+            redirect={isAuthenticated}
+          />
+          <Stack.Screen
+            name="(tabs)"
+            redirect={!isAuthenticated}
+          />
+          <Stack.Screen
+            name="signin"
+            redirect={isAuthenticated}
+          />
+          <Stack.Screen
+            name="pages"
+            redirect={!isAuthenticated}
+          />
+        </Stack>
       </ThemeProvider>
     </GluestackUIProvider>
   );

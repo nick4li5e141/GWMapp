@@ -1,11 +1,11 @@
 import { Box, Button, Center, GluestackUIProvider, Heading, Input, InputField, Text } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import firestore from '@react-native-firebase/firestore';
-import { useRouter } from 'expo-router';
+import { useNavigation, useRouter, useSegments } from 'expo-router';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
-import React, { useState } from 'react';
-import { Platform } from 'react-native';
-import { app } from '../../firebase.config';
+import React, { useEffect, useState } from 'react';
+import { BackHandler, Platform, View } from 'react-native';
+import { app } from '../firebase.config';
 
 interface UserData {
   address: string;
@@ -23,10 +23,69 @@ interface SessionData {
 
 export default function Signin(): JSX.Element {
   const router = useRouter();
+  const navigation = useNavigation();
+  const segments = useSegments();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Check authentication status
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const sessionData = await AsyncStorage.getItem('userSession');
+        console.log('Checking session:', sessionData);
+        
+        if (sessionData) {
+          const session: SessionData = JSON.parse(sessionData);
+          if (session.isAuthenticated) {
+            console.log('Found authenticated session, redirecting to tabs');
+            setIsAuthenticated(true);
+            router.replace('/(tabs)');
+            return;
+          } else {
+            console.log('Found invalid session, clearing storage');
+            await AsyncStorage.clear();
+            setIsAuthenticated(false);
+          }
+        } else {
+          console.log('No session found');
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+        await AsyncStorage.clear();
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  // Handle back button press
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Check if user is authenticated
+      const checkAuth = async () => {
+        const sessionData = await AsyncStorage.getItem('userSession');
+        if (sessionData) {
+          const session: SessionData = JSON.parse(sessionData);
+          if (session.isAuthenticated) {
+            router.replace('/(tabs)');
+            return true;
+          }
+        }
+        return false;
+      };
+      
+      checkAuth();
+      return true;
+    });
+
+    return () => backHandler.remove();
+  }, []);
 
   const createSession = async (userData: UserData) => {
     try {
@@ -77,6 +136,8 @@ export default function Signin(): JSX.Element {
 
           // Create session after successful authentication
           await createSession(userData);
+          setIsAuthenticated(true);
+          router.replace('/(tabs)');
         } catch (error) {
           setErrors({ general: 'Failed to sign in. Please try again.' });
           return;
@@ -107,15 +168,13 @@ export default function Signin(): JSX.Element {
 
           // Create session after successful authentication
           await createSession(userData);
+          setIsAuthenticated(true);
+          router.replace('/(tabs)');
         } catch (error) {
           setErrors({ general: 'Failed to sign in. Please try again.' });
           return;
         }
       }
-
-      // Navigate to tabs
-      router.replace('/(tabs)');
-      
     } catch (error: any) {
       setErrors({ general: 'Failed to sign in. Please try again.' });
     } finally {
@@ -143,6 +202,11 @@ export default function Signin(): JSX.Element {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  // If authenticated, return an empty view
+  if (isAuthenticated) {
+    return <View style={{ flex: 1 }} />;
+  }
 
   return (
     <GluestackUIProvider>
@@ -182,11 +246,7 @@ export default function Signin(): JSX.Element {
             width: '100%',
             backgroundColor: 'white',
             borderRadius: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
-            elevation: 2,
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
             borderColor: errors.email ? '#ef4444' : 'transparent'
           }}>
             <InputField 
@@ -211,11 +271,7 @@ export default function Signin(): JSX.Element {
             width: '100%',
             backgroundColor: 'white',
             borderRadius: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
-            elevation: 2,
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
             borderColor: errors.password ? '#ef4444' : 'transparent'
           }}>
             <InputField 
