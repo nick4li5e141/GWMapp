@@ -1,5 +1,8 @@
 import { Checkbox, CheckboxIndicator } from '@gluestack-ui/themed';
-import React, { useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import firestore from '@react-native-firebase/firestore';
+import * as Location from 'expo-location';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Button,
@@ -9,7 +12,6 @@ import {
   TextInput,
   View
 } from 'react-native';
-import * as Location from 'expo-location';
 
 interface Job {
   id: string;
@@ -19,12 +21,22 @@ interface Job {
   time: string;
   taskList: Task[];
   description: string;
+  locationData?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 interface Task {
   id: string;
   label: string;
   completed: boolean;
+}
+
+interface SessionData {
+  email: string;
+  name: string;
+  isAuthenticated: boolean;
 }
 
 const currentJobs: Job[] = [
@@ -61,33 +73,190 @@ const currentJobs: Job[] = [
 
 const CurrentJobs = () => {
   const [jobs, setJobs] = useState<Job[]>(currentJobs);
+  const [userId, setUserId] = useState<string>('');
+  const [userDocId, setUserDocId] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const toggleTask = (jobId: string, taskId: string) => {
-    setJobs(jobs.map(job => {
-      if (job.id === jobId) {
-        return {
-          ...job,
-          taskList: job.taskList.map(task =>
-            task.id === taskId ? { ...task, completed: !task.completed } : task
-          )
-        };
+  useEffect(() => {
+    const loadUserSession = async () => {
+      try {
+        const sessionData = await AsyncStorage.getItem('userSession');
+        if (sessionData) {
+          const session: SessionData = JSON.parse(sessionData);
+          setUserId(session.email);
+          
+          // Get user's document ID from the gwm collection
+          const usersRef = firestore().collection('gwm');
+          const userQuery = await usersRef.where('email', '==', session.email).get();
+          
+          if (!userQuery.empty) {
+            const docId = userQuery.docs[0].id;
+            setUserDocId(docId);
+            // Load jobs after getting userDocId
+            await loadUserJobs(docId);
+          } else {
+            // If user document doesn't exist, create it
+            const newUserDoc = await usersRef.add({
+              email: session.email,
+              name: session.name,
+              createdAt: firestore.FieldValue.serverTimestamp()
+            });
+            setUserDocId(newUserDoc.id);
+            // Load jobs after creating new user document
+            await loadUserJobs(newUserDoc.id);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user session:', error);
+        Alert.alert('Error', 'Failed to load user session');
+      } finally {
+        setIsLoading(false);
       }
-      return job;
-    }));
+    };
+
+    loadUserSession();
+  }, []);
+
+  const loadUserJobs = async (docId: string) => {
+    try {
+      const jobsRef = firestore()
+        .collection('gwm')
+        .doc(docId)
+        .collection('jobs');
+
+      const jobsSnapshot = await jobsRef.get();
+      
+      if (!jobsSnapshot.empty) {
+        const fetchedJobs = jobsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            ...data,
+            id: doc.id,
+            taskList: data.taskList || [],
+            description: data.description || '',
+            locationData: data.locationData || undefined
+          } as Job;
+        });
+        setJobs(fetchedJobs);
+      } else {
+        // If no jobs exist, initialize with default jobs
+        const batch = firestore().batch();
+        for (const job of currentJobs) {
+          const jobRef = jobsRef.doc(job.id);
+          batch.set(jobRef, {
+            ...job,
+            updatedAt: firestore.FieldValue.serverTimestamp(),
+            status: 'in_progress'
+          });
+        }
+        await batch.commit();
+        setJobs(currentJobs);
+      }
+    } catch (error) {
+      console.error('Error loading jobs:', error);
+      Alert.alert('Error', 'Failed to load jobs');
+    }
   };
 
-  const updateDescription = (jobId: string, text: string) => {
-    setJobs(jobs.map(job =>
-      job.id === jobId ? { ...job, description: text } : job
-    ));
+  const toggleTask = async (jobId: string, taskId: string) => {
+    try {
+      const updatedJobs = jobs.map(job => {
+        if (job.id === jobId) {
+          const updatedTaskList = job.taskList.map(task =>
+            task.id === taskId ? { ...task, completed: !task.completed } : task
+          );
+          
+          // Update Firestore
+          firestore()
+            .collection('gwm')
+            .doc(userDocId)
+            .collection('jobs')
+            .doc(jobId)
+            .update({
+              taskList: updatedTaskList,
+              updatedAt: firestore.FieldValue.serverTimestamp()
+            });
+          
+          return {
+            ...job,
+            taskList: updatedTaskList
+          };
+        }
+        return job;
+      });
+      
+      setJobs(updatedJobs);
+    } catch (error) {
+      console.error('Error updating task:', error);
+      Alert.alert('Error', 'Failed to update task status');
+    }
   };
 
-  const handleSubmit = () => {
-    console.log('Submitted Jobs:', jobs);
-    Alert.alert('Submitted', 'Your updates have been submitted successfully!');
+  const updateDescription = async (jobId: string, text: string) => {
+    try {
+      const updatedJobs = jobs.map(job =>
+        job.id === jobId ? { ...job, description: text } : job
+      );
+      
+      // Update Firestore
+      await firestore()
+        .collection('gwm')
+        .doc(userDocId)
+        .collection('jobs')
+        .doc(jobId)
+        .update({
+          description: text,
+          updatedAt: firestore.FieldValue.serverTimestamp()
+        });
+      
+      setJobs(updatedJobs);
+    } catch (error) {
+      console.error('Error updating description:', error);
+      Alert.alert('Error', 'Failed to update description');
+    }
   };
 
-  const handlePinLocation = async () => {
+  const handleSubmit = async () => {
+    if (!userId || !userDocId) {
+      Alert.alert('Error', 'User session not found. Please sign in again.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Create a batch write
+      const batch = firestore().batch();
+      
+      // Add each job to the user's jobs subcollection
+      for (const job of jobs) {
+        const jobRef = firestore()
+          .collection('gwm')
+          .doc(userDocId)
+          .collection('jobs')
+          .doc(job.id);
+        
+        batch.set(jobRef, {
+          ...job,
+          updatedAt: firestore.FieldValue.serverTimestamp(),
+          status: 'in_progress'
+        });
+      }
+      
+      // Commit the batch
+      await batch.commit();
+      
+      Alert.alert('Success', 'Your job updates have been saved successfully!');
+    } catch (error) {
+      console.error('Error saving jobs:', error);
+      Alert.alert('Error', 'Failed to save job updates. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePinLocation = async (jobId: string) => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -97,12 +266,28 @@ const CurrentJobs = () => {
 
       const location = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = location.coords;
-      Alert.alert('Location Pinned', `Latitude: ${latitude.toFixed(6)}\nLongitude: ${longitude.toFixed(6)}`);
+      
+      // Update the job with location data
+      setJobs(jobs.map(job =>
+        job.id === jobId
+          ? { ...job, locationData: { latitude, longitude } }
+          : job
+      ));
+      
+      Alert.alert('Location Pinned', `Location has been pinned for ${jobs.find(j => j.id === jobId)?.client}`);
     } catch (error) {
       Alert.alert('Error', 'Failed to get location.');
       console.error(error);
     }
   };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text>Loading jobs...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -149,15 +334,29 @@ const CurrentJobs = () => {
               style={styles.descriptionInput}
             />
           </View>
+
+          <View style={styles.locationButton}>
+            <Button 
+              title={job.locationData ? "Update Location" : "PIN Location"} 
+              onPress={() => handlePinLocation(job.id)} 
+              color="#3b82f6" 
+            />
+            {job.locationData && (
+              <Text style={styles.locationText}>
+                Location: {job.locationData.latitude.toFixed(6)}, {job.locationData.longitude.toFixed(6)}
+              </Text>
+            )}
+          </View>
         </View>
       ))}
 
-      <View style={{ marginVertical: 10, paddingHorizontal: 20 }}>
-        <Button title="PIN Location" onPress={handlePinLocation} color="#3b82f6" />
-      </View>
-
       <View style={{ marginVertical: 20, paddingHorizontal: 20 }}>
-        <Button title="Submit" onPress={handleSubmit} color="#10b981" />
+        <Button 
+          title={loading ? "Saving..." : "Submit"} 
+          onPress={handleSubmit} 
+          color="#10b981"
+          disabled={loading}
+        />
       </View>
     </ScrollView>
   );
@@ -250,23 +449,35 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   descriptionBox: {
-    marginTop: 10,
+    marginTop: 15,
   },
   descriptionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 8,
     color: '#333',
   },
   descriptionInput: {
-    height: 100,
-    backgroundColor: '#f8fafc',
-    borderColor: '#e2e8f0',
     borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 4,
     padding: 8,
+    minHeight: 80,
     textAlignVertical: 'top',
   },
+  locationButton: {
+    marginTop: 15,
+  },
+  locationText: {
+    marginTop: 5,
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center'
+  }
 });
 
 export default CurrentJobs;
