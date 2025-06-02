@@ -2,10 +2,8 @@ import { Box, Button, Center, GluestackUIProvider, Heading, Input, InputField, T
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import firestore from '@react-native-firebase/firestore';
 import { useNavigation, useRouter, useSegments } from 'expo-router';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { BackHandler, Platform, View } from 'react-native';
-import { app } from '../firebase.config';
+import { BackHandler, View } from 'react-native';
 
 interface UserData {
   address: string;
@@ -109,73 +107,29 @@ export default function Signin(): JSX.Element {
     try {
       setLoading(true);
       setErrors({}); // Clear any previous errors
-      let userData: UserData | null = null;
 
-      if (Platform.OS === 'web') {
-        const db = getFirestore(app);
-        
-        try {
-          const userDoc = await getDoc(doc(db, 'gwm', 'user_001'));
-          
-          if (!userDoc.exists()) {
-            setErrors({ general: 'No account found with this email' });
-            return;
-          }
+      // Query for user by email
+      const usersRef = firestore().collection('gwm');
+      const userQuery = await usersRef.where('email', '==', email).get();
 
-          userData = userDoc.data() as UserData;
-          
-          if (userData.email !== email) {
-            setErrors({ general: 'No account found with this email' });
-            return;
-          }
-          
-          if (userData.password !== password) {
-            setErrors({ password: 'Incorrect password' });
-            return;
-          }
-
-          // Create session after successful authentication
-          await createSession(userData);
-          setIsAuthenticated(true);
-          router.replace('/(tabs)');
-        } catch (error) {
-          setErrors({ general: 'Failed to sign in. Please try again.' });
-          return;
-        }
-      } else {
-        try {
-          const userDoc = await firestore()
-            .collection('gwm')
-            .doc('user_001')
-            .get();
-
-          if (!userDoc.exists) {
-            setErrors({ general: 'No account found with this email' });
-            return;
-          }
-
-          userData = userDoc.data() as UserData;
-          
-          if (userData.email !== email) {
-            setErrors({ general: 'No account found with this email' });
-            return;
-          }
-          
-          if (userData.password !== password) {
-            setErrors({ password: 'Incorrect password' });
-            return;
-          }
-
-          // Create session after successful authentication
-          await createSession(userData);
-          setIsAuthenticated(true);
-          router.replace('/(tabs)');
-        } catch (error) {
-          setErrors({ general: 'Failed to sign in. Please try again.' });
-          return;
-        }
+      if (userQuery.empty) {
+        setErrors({ general: 'No account found with this email' });
+        return;
       }
-    } catch (error: any) {
+
+      const userDoc = userQuery.docs[0];
+      const userData = userDoc.data() as UserData;
+
+      if (userData.password !== password) {
+        setErrors({ password: 'Incorrect password' });
+        return;
+      }
+
+      // Create session after successful authentication
+      await createSession(userData);
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('Error signing in:', error);
       setErrors({ general: 'Failed to sign in. Please try again.' });
     } finally {
       setLoading(false);
@@ -246,7 +200,7 @@ export default function Signin(): JSX.Element {
             width: '100%',
             backgroundColor: 'white',
             borderRadius: 8,
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+            elevation: 2,
             borderColor: errors.email ? '#ef4444' : 'transparent'
           }}>
             <InputField 
@@ -271,7 +225,7 @@ export default function Signin(): JSX.Element {
             width: '100%',
             backgroundColor: 'white',
             borderRadius: 8,
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+            elevation: 2,
             borderColor: errors.password ? '#ef4444' : 'transparent'
           }}>
             <InputField 

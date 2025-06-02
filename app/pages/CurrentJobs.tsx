@@ -21,6 +21,12 @@ interface Job {
   time: string;
   taskList: Task[];
   description: string;
+  notes: {
+    id: string;
+    content: string;
+    timestamp: string;
+    type: 'general' | 'issue' | 'followup';
+  }[];
   locationData?: {
     latitude: number;
     longitude: number;
@@ -53,7 +59,8 @@ const currentJobs: Job[] = [
       { id: '4', label: 'Mop kitchen floor', completed: false },
       { id: '5', label: 'Clean bathroom mirrors', completed: false }
     ],
-    description: ''
+    description: '',
+    notes: []
   },
   {
     id: '2',
@@ -67,7 +74,8 @@ const currentJobs: Job[] = [
       { id: '3', label: 'Clean window sills', completed: false },
       { id: '4', label: 'Wipe down blinds', completed: false }
     ],
-    description: ''
+    description: '',
+    notes: []
   }
 ];
 
