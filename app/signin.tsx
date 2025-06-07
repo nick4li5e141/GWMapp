@@ -11,6 +11,7 @@ interface UserData {
   name: string;
   password: string;
   phoneNumber: string;
+  role: string;
 }
 
 interface SessionData {
@@ -127,7 +128,16 @@ export default function Signin(): JSX.Element {
 
       // Create session after successful authentication
       await createSession(userData);
-      router.replace('/(tabs)');
+
+      // Check for admin role and redirect accordingly
+      if (userData.role === 'admin') {
+        console.log('Admin user signed in, redirecting to admin dashboard.');
+        router.replace('/admin'); // Redirect to the admin dashboard path
+      } else {
+        console.log('Regular user signed in, redirecting to tabs.');
+        router.replace('/(tabs)'); // Redirect to the regular user tabs
+      }
+
     } catch (error) {
       console.error('Error signing in:', error);
       setErrors({ general: 'Failed to sign in. Please try again.' });
