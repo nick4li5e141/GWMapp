@@ -6,6 +6,15 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 
+interface Job {
+  id: string;
+  shiftStart: string;
+  shiftEnd: string;
+  pay: number;
+  location: string;
+  assignedBy: string;
+}
+
 interface MarkedDate {
   selected?: boolean;
   marked?: boolean;
@@ -15,17 +24,9 @@ interface MarkedDate {
   disabled?: boolean;
   textColor?: string;
   disableTouchEvent?: boolean;
-  status?: 'unavailable' | 'pending' | 'available' | 'request_pending' | 'request_approved' | 'request_rejected';
-  hours?: number;
-  shiftStart?: string;
-  shiftEnd?: string;
-  location?: string;
-  assignedBy?: string;
-} const markedDates: MarkedDates = {
-    '2023-10-25': { selected: true, marked: true, selectedColor: '#00adf5', hours: 8, shiftStart: "09:00", shiftEnd: "17:00", location: "Site A", assignedBy: "admin_user_id" },
-    '2023-10-26': { marked: true, hours: 7, shiftStart: "09:00", shiftEnd: "16:00", location: "Site B", assignedBy: "admin_user_id" },
-    '2023-10-28': { disabled: true, disableTouchEvent: true, hours: 0, shiftStart: "09:00", shiftEnd: "17:00", location: "Site C", assignedBy: "admin_user_id" }
-  };
+  status?: 'unavailable' | 'pending' | 'available' | 'request_pending' | 'request_approved' | 'request_rejected' | 'scheduled';
+  jobs?: Job[];
+}
 
 interface MarkedDates {
   [date: string]: MarkedDate;
@@ -42,9 +43,8 @@ const MySchedule = () => {
   const [loading, setLoading] = useState(true); // Add loading state
   const [isSubmitting, setIsSubmitting] = useState(false); // Add submission state
   const [currentUserId, setCurrentUserId] = useState<string | null>(null); // New state for storing user UID
+  const [markedDates, setMarkedDates] = useState<MarkedDates>({});
   const router = useRouter();
-
- 
 
   const holidayDates: MarkedDates = {
     '2023-11-01': { 
@@ -310,7 +310,7 @@ const MySchedule = () => {
   // Use useEffect to fetch scheduled shifts and day off requests when the component mounts
   useEffect(() => {
     console.log('useEffect triggered');
-    setLoading(true); // Start loading
+    setLoading(true);
 
     const loadUserAndData = async () => {
       try {
@@ -322,38 +322,70 @@ const MySchedule = () => {
           const session: { email: string; isAuthenticated: boolean } = JSON.parse(sessionData);
           if (session.isAuthenticated && session.email) {
             console.log('Session authenticated, fetching user UID by email...');
-            // Query Firestore to get user UID by email
             const usersRef = firestore().collection('gwm');
             const userQuery = await usersRef.where('email', '==', session.email).limit(1).get();
 
             if (!userQuery.empty) {
               const userDoc = userQuery.docs[0];
-              const userId = userDoc.id; // Found user ID
-              setCurrentUserId(userId); // Set state
+              const userId = userDoc.id;
+              setCurrentUserId(userId);
               console.log('Fetched user UID:', userId);
 
-              // --- Data Fetching after getting UID ---
-              console.log('Fetching scheduled data and day off requests...');
-              // TODO: Fetch detailed shifts when the component loads (existing stub)
-              // await fetchScheduledShifts(userId, currentMonthYear);
+              // Fetch scheduled shifts
+              const fetchedShifts: MarkedDates = {};
+              const dates = ['2025-06-02', '2025-06-12']; // Keep all dates for calendar
+              
+              for (const date of dates) {
+                const datesSnapshot = await firestore()
+                  .collection('gwm')
+                  .doc(userId)
+                  .collection('scheduledShiftsDetails')
+                  .doc('2023-10')
+                  .collection(date)
+                  .get();
+                
+                // Get all jobs for this date
+                const jobs: Job[] = [];
+                datesSnapshot.forEach((doc) => {
+                  const data = doc.data();
+                  if (data) {
+                    jobs.push({
+                      id: doc.id,
+                      shiftStart: data.shiftStart,
+                      shiftEnd: data.shiftEnd,
+                      pay: data.pay,
+                      location: data.location,
+                      assignedBy: data.assignedBy,
+                    });
+                  }
+                });
+
+                if (jobs.length > 0) {
+                  fetchedShifts[date] = {
+                    status: 'scheduled',
+                    marked: true,
+                    selectedColor: '#00adf5',
+                    jobs: jobs
+                  };
+                }
+              }
+
+              setMarkedDates(fetchedShifts);
+              console.log('Fetched scheduled shifts:', fetchedShifts);
 
               // Fetch day off requests
               await fetchDayOffRequests(userId);
               console.log('Data fetching complete.');
-              // --- End Data Fetching ---
 
             } else {
               console.error('User document not found for session email:', session.email);
-              // Handle case where user is authenticated in session but not found in Firestore
               Alert.alert('Error', 'User not found in database.');
             }
           } else {
-            // Session exists but is not authenticated or email is missing
             console.log('Session found but not authenticated or missing email.');
-             Alert.alert('Session Invalid', 'Please sign in again.');
+            Alert.alert('Session Invalid', 'Please sign in again.');
           }
         } else {
-          // No session found, user is not logged in
           console.log('No user session found.');
           Alert.alert('Not Logged In', 'Please sign in to view your schedule.');
         }
@@ -362,14 +394,11 @@ const MySchedule = () => {
         console.error('Error in loadUserAndData:', error);
         Alert.alert('Error', 'Failed to load schedule data.');
       } finally {
-        console.log('loadUserAndData finished, setting loading to false.');
-        setLoading(false); // Ensure loading is set to false
+        setLoading(false);
       }
     };
 
-    loadUserAndData(); // Call the async function
-
-    // Depend on currentMonthYear for re-fetching when month changes
+    loadUserAndData();
   }, [currentMonthYear]);
 
   // Handler for the submit button - potentially update to use saveScheduledShifts
@@ -450,36 +479,47 @@ const MySchedule = () => {
           }}
         />
 
-        {isRequestingDayOff && (
-          <View style={styles.legendContainer}>
-            <Text style={styles.legendTitle}>Status Legend:</Text>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#FFC107' }]} />
-              <Text style={styles.legendText}>Request Pending</Text>
-            </View>
-            <View style={styles.legendItem}>
-               <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
-               <Text style={styles.legendText}>Request Approved</Text>
-             </View>
-             <View style={styles.legendItem}>
-               <View style={[styles.legendDot, { backgroundColor: '#F44336' }]} />
-               <Text style={styles.legendText}>Request Rejected</Text>
-             </View>
+        {!isRequestingDayOff && selectedDate && (
+          <View style={styles.selectedDayDetails}>
+            <Text style={styles.selectedDayHeaderText}>Schedule for {selectedDate}:</Text>
+            {markedDates[selectedDate]?.jobs?.map((job, idx) => (
+              <View key={job.id || idx} style={styles.jobItem}>
+                <Text style={styles.jobText}>Shift: {job.shiftStart} - {job.shiftEnd}</Text>
+                <Text style={styles.jobText}>Pay: ${job.pay}</Text>
+                <Text style={styles.jobText}>Location: {job.location}</Text>
+                <Text style={styles.jobText}>Assigned By: {job.assignedBy}</Text>
+              </View>
+            ))}
+            {!markedDates[selectedDate]?.jobs?.length && (
+              <Text style={styles.detailText}>No scheduled jobs for this date.</Text>
+            )}
           </View>
         )}
 
         {!isRequestingDayOff && (
           <View style={styles.workingDaysContainer}>
-            <Text style={styles.workingDaysTitle}>Days You're Scheduled to Work:</Text>
-            {workingDatesList.map(date => (
-              <View key={date} style={{ marginBottom: 10 }}>
-                <Text style={styles.workingDayText}>• {date}</Text>
-                <Text style={styles.workingDayText}>  Shift: {markedDates[date]?.shiftStart || 'N/A'} - {markedDates[date]?.shiftEnd || 'N/A'}</Text>
-                <Text style={styles.workingDayText}>  Hours: {markedDates[date]?.hours || 0}</Text>
-                <Text style={styles.workingDayText}>  Location: {markedDates[date]?.location || 'N/A'}</Text>
-                <Text style={styles.workingDayText}>  Assigned By: {markedDates[date]?.assignedBy || 'N/A'}</Text>
-              </View>
-            ))}
+            <Text style={styles.workingDaysTitle}>Next 7 Days Schedule:</Text>
+            {Object.entries(markedDates)
+              .filter(([date]) => {
+                const jobDate = new Date(date);
+                const today = new Date();
+                const sevenDaysFromNow = new Date();
+                sevenDaysFromNow.setDate(today.getDate() + 6);
+                return jobDate >= today && jobDate <= sevenDaysFromNow;
+              })
+              .map(([date, data]) => (
+                <View key={date} style={styles.jobItem}>
+                  <Text style={styles.workingDayText}>• {date}</Text>
+                  {data.jobs?.map((job, idx) => (
+                    <View key={job.id || idx} style={styles.jobDetails}>
+                      <Text style={styles.jobText}>Shift: {job.shiftStart} - {job.shiftEnd}</Text>
+                      <Text style={styles.jobText}>Pay: ${job.pay}</Text>
+                      <Text style={styles.jobText}>Location: {job.location}</Text>
+                      <Text style={styles.jobText}>Assigned By: {job.assignedBy}</Text>
+                    </View>
+                  ))}
+                </View>
+              ))}
             <Text style={styles.totalHoursText}>Total Scheduled Hours ({currentMonthYear}): {totalScheduledHours}</Text>
             <Pressable
               style={({ pressed }) => [
@@ -497,7 +537,7 @@ const MySchedule = () => {
           </View>
         )}
 
-        {isRequestingDayOff && Object.keys(requestedDaysOff).length > 0 && (
+        {isRequestingDayOff && (
           <View style={[styles.workingDaysContainer, { backgroundColor: '#fff3e0' }]}>
             <Text style={styles.workingDaysTitle}>Requested Day(s) Off:</Text>
             {Object.keys(requestedDaysOff).map(date => (
@@ -664,6 +704,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  jobItem: {
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  jobDetails: {
+    marginLeft: 20,
+    marginTop: 5,
+  },
+  jobText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  selectedDayDetails: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#eaf6ff',
+    borderRadius: 8,
+  },
+  selectedDayHeaderText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  detailText: {
+    fontSize: 16,
+    color: '#555',
+    marginBottom: 4,
   },
 });
 
