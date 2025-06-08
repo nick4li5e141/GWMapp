@@ -76,7 +76,49 @@ const currentJobs: Job[] = [
     ],
     description: '',
     notes: []
-  }
+  }, {
+    id: '3',
+    client: 'Client C',
+    location: '456 Oak Ave, Anytown',
+    tasks: 'Window cleaning, dusting',
+    time: '1:00 PM - 2:30 PM',
+    taskList: [
+      { id: '1', label: 'Clean all windows', completed: false },
+      { id: '2', label: 'Dust all surfaces', completed: false },
+      { id: '3', label: 'Clean window sills', completed: false },
+      { id: '4', label: 'Wipe down blinds', completed: false }
+    ],
+    description: '',
+    notes: []
+  }, {
+    id: '4',
+    client: 'Client D',
+    location: '456 Oak Ave, Anytown',
+    tasks: 'Window cleaning, dusting',
+    time: '1:00 PM - 2:30 PM',
+    taskList: [
+      { id: '1', label: 'Clean all windows', completed: false },
+      { id: '2', label: 'Dust all surfaces', completed: false },
+      { id: '3', label: 'Clean window sills', completed: false },
+      { id: '4', label: 'Wipe down blinds', completed: false }
+    ],
+    description: '',
+    notes: []
+  }, {
+    id: '5',
+    client: 'Client E',
+    location: '456 Oak Ave, Anytown',
+    tasks: 'Window cleaning, dusting',
+    time: '1:00 PM - 2:30 PM',
+    taskList: [
+      { id: '1', label: 'Clean all windows', completed: false },
+      { id: '2', label: 'Dust all surfaces', completed: false },
+      { id: '3', label: 'Clean window sills', completed: false },
+      { id: '4', label: 'Wipe down blinds', completed: false }
+    ],
+    description: '',
+    notes: []
+  },
 ];
 
 const CurrentJobs = () => {
