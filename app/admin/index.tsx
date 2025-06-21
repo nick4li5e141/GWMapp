@@ -16,7 +16,7 @@ interface DayOffRequest {
   id: string;
   userId: string;
   userEmail: string;
-  date: Timestamp;
+  date: string;
   status: 'pending' | 'approved' | 'rejected';
   requestedAt: Timestamp;
 }
@@ -48,18 +48,18 @@ const AdminDashboard = () => {
        const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
        const lastDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6));
 
-       firstDayOfWeek.setHours(0, 0, 0, 0);
-       lastDayOfWeek.setHours(23, 59, 59, 999);
+       const firstDay = firstDayOfWeek.toISOString().split('T')[0];
+       const lastDay = lastDayOfWeek.toISOString().split('T')[0];
 
-       console.log('Filtering requests for the week:', firstDayOfWeek, 'to', lastDayOfWeek);
+       console.log('Filtering requests for the week:', firstDay, 'to', lastDay);
 
        for (const user of usersList) {
          const requestsSnapshot = await firestore()
            .collection('gwm')
            .doc(user.id)
            .collection('dayOffRequests')
-           .where('date', '>=', firstDayOfWeek)
-           .where('date', '<=', lastDayOfWeek)
+           .where('date', '>=', firstDay)
+           .where('date', '<=', lastDay)
            .get();
 
          requestsSnapshot.forEach(doc => {
@@ -157,7 +157,7 @@ const AdminDashboard = () => {
   const renderRequestItem = ({ item }: { item: DayOffRequest }) => (
     <View style={styles.requestItem}>
       <Text style={styles.requestUser}>User: {item.userEmail}</Text>
-      <Text style={styles.requestDate}>Date: {item.date.toDate().toDateString()}</Text>
+      <Text style={styles.requestDate}>Date: {item.date}</Text>
       <Text style={styles.requestStatus}>Status: {item.status}</Text>
       <View style={styles.requestActions}>
         <RNButton title="Approve" onPress={() => approveDayOffRequest(item.userId, item.id)} />

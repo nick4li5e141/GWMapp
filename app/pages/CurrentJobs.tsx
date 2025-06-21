@@ -86,7 +86,8 @@ const currentJobs: Job[] = [
       { id: '1', label: 'Clean all windows', completed: false },
       { id: '2', label: 'Dust all surfaces', completed: false },
       { id: '3', label: 'Clean window sills', completed: false },
-      { id: '4', label: 'Wipe down blinds', completed: false }
+      { id: '4', label: 'Wipe down blinds', completed: false },
+      { id: '5', label: 'Empty trash bins', completed: false }
     ],
     description: '',
     notes: []
@@ -100,7 +101,8 @@ const currentJobs: Job[] = [
       { id: '1', label: 'Clean all windows', completed: false },
       { id: '2', label: 'Dust all surfaces', completed: false },
       { id: '3', label: 'Clean window sills', completed: false },
-      { id: '4', label: 'Wipe down blinds', completed: false }
+      { id: '4', label: 'Wipe down blinds', completed: false },
+      { id: '5', label: 'Empty trash bins', completed: false }
     ],
     description: '',
     notes: []
@@ -114,7 +116,8 @@ const currentJobs: Job[] = [
       { id: '1', label: 'Clean all windows', completed: false },
       { id: '2', label: 'Dust all surfaces', completed: false },
       { id: '3', label: 'Clean window sills', completed: false },
-      { id: '4', label: 'Wipe down blinds', completed: false }
+      { id: '4', label: 'Wipe down blinds', completed: false },
+      { id: '5', label: 'Empty trash bins', completed: false }
     ],
     description: '',
     notes: []
@@ -177,21 +180,62 @@ const CurrentJobs = () => {
 
       const jobsSnapshot = await jobsRef.get();
       
-      if (!jobsSnapshot.empty) {
-        const fetchedJobs = jobsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            ...data,
-            id: doc.id,
-            taskList: data.taskList || [],
-            description: data.description || '',
-            locationData: data.locationData || undefined
-          } as Job;
-        });
-        setJobs(fetchedJobs);
+      let fetchedJobs = jobsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          taskList: data.taskList || [],
+          description: data.description || '',
+          locationData: data.locationData || undefined
+        } as Job;
+      });
+
+      const fetchedJobIds = new Set(fetchedJobs.map(job => job.id));
+      const missingJobs = currentJobs.filter(job => !fetchedJobIds.has(job.id));
+      let needsTaskSync = false;
+
+      // Check for missing tasks in existing jobs
+      const batch = firestore().batch();
+      fetchedJobs = fetchedJobs.map(job => {
+        const defaultJob = currentJobs.find(j => j.id === job.id);
+        if (defaultJob) {
+          const existingTaskIds = new Set(job.taskList.map(t => t.id));
+          const missingTasks = defaultJob.taskList.filter(t => !existingTaskIds.has(t.id));
+          if (missingTasks.length > 0) {
+            needsTaskSync = true;
+            const updatedTaskList = [...job.taskList, ...missingTasks];
+            // Update Firestore with the new task list
+            batch.update(jobsRef.doc(job.id), {
+              taskList: updatedTaskList,
+              updatedAt: firestore.FieldValue.serverTimestamp(),
+            });
+            return { ...job, taskList: updatedTaskList };
+          }
+        }
+        return job;
+      });
+
+      if (missingJobs.length > 0) {
+        for (const job of missingJobs) {
+          const jobRef = jobsRef.doc(job.id);
+          batch.set(jobRef, {
+            ...job,
+            updatedAt: firestore.FieldValue.serverTimestamp(),
+            status: 'in_progress'
+          });
+        }
+        await batch.commit();
+        // Combine existing and newly added jobs, then sort them by ID
+        const allJobs = [...fetchedJobs, ...missingJobs].sort((a, b) => a.id.localeCompare(b.id));
+        setJobs(allJobs);
+      } else if (needsTaskSync) {
+        await batch.commit();
+        setJobs(fetchedJobs.sort((a, b) => a.id.localeCompare(b.id)));
+      } else if (fetchedJobs.length > 0) {
+        setJobs(fetchedJobs.sort((a, b) => a.id.localeCompare(b.id)));
       } else {
-        // If no jobs exist, initialize with default jobs
-        const batch = firestore().batch();
+        // This is the initial seed for a new user
         for (const job of currentJobs) {
           const jobRef = jobsRef.doc(job.id);
           batch.set(jobRef, {
@@ -204,8 +248,8 @@ const CurrentJobs = () => {
         setJobs(currentJobs);
       }
     } catch (error) {
-      console.error('Error loading jobs:', error);
-      Alert.alert('Error', 'Failed to load jobs');
+      console.error('Error loading or syncing jobs:', error);
+      Alert.alert('Error', 'Failed to load or sync jobs');
     }
   };
 

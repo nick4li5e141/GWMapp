@@ -26,6 +26,7 @@ interface MarkedDate {
   disableTouchEvent?: boolean;
   status?: 'unavailable' | 'pending' | 'available' | 'request_pending' | 'request_approved' | 'request_rejected' | 'scheduled';
   jobs?: Job[];
+  hours?: number;
 }
 
 interface MarkedDates {
@@ -168,7 +169,7 @@ const MySchedule = () => {
       // The check for docSnap.exists and data processing should be handled here.
       console.log('Fetched scheduled shifts doc snap for', monthYear, ':', docSnap);
 
-      if (docSnap.exists) {
+      if (docSnap.exists()) {
          const data = docSnap.data();
          console.log('Fetched scheduled shifts data:', data);
          return data; // Return fetched data
@@ -281,7 +282,7 @@ const MySchedule = () => {
         // Assuming the status and other relevant info are in the requestData object
         batch.set(dayOffRequestsCollectionRef.doc(date), { 
           status: 'pending', // Set initial status to pending
-          date: firestore.Timestamp.fromDate(new Date(date)), // Save date as Timestamp
+          date: date, // Save date as a 'YYYY-MM-DD' string
           requestedAt: firestore.FieldValue.serverTimestamp(),
           // Add any other relevant fields here
          });
@@ -525,7 +526,7 @@ const MySchedule = () => {
               style={({ pressed }) => [
                 styles.submitButton,
                 pressed && styles.submitButtonPressed,
-                isSubmitting && styles.submitButtonSubmitting
+                isSubmitting && styles.submitButtonSubmitting,
               ]}
               onPress={handleSubmit}
               disabled={isSubmitting}
@@ -540,9 +541,21 @@ const MySchedule = () => {
         {isRequestingDayOff && (
           <View style={[styles.workingDaysContainer, { backgroundColor: '#fff3e0' }]}>
             <Text style={styles.workingDaysTitle}>Requested Day(s) Off:</Text>
-            {Object.keys(requestedDaysOff).map(date => (
-              <Text key={date} style={styles.workingDayText}>• {date} - Pending</Text>
-            ))}
+            {Object.keys(requestedDaysOff).length > 0 ? (
+              Object.keys(requestedDaysOff).map(date => (
+                <View key={date} style={styles.pendingRequestItem}>
+                  <Text style={styles.workingDayText}>• {date}</Text>
+                  <Pressable 
+                    onPress={() => handleDayPress({ dateString: date, day: 0, month: 0, year: 0, timestamp: 0 })} 
+                    style={styles.removeButton}
+                  >
+                    <Text style={styles.removeButtonText}>Remove</Text>
+                  </Pressable>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.detailText}>Tap on a date in the calendar to select it for your request.</Text>
+            )}
           </View>
         )}
       </ScrollView>
@@ -677,13 +690,14 @@ const styles = StyleSheet.create({
   totalHoursText: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 10,
     color: '#333',
+    marginTop: 15,
     marginBottom: 10,
+    textAlign: 'center',
   },
   submitButton: {
-    backgroundColor: '#10b981',
-    padding: 12,
+    backgroundColor: '#007BFF',
+    paddingVertical: 15,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
@@ -736,6 +750,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#555',
     marginBottom: 4,
+  },
+  pendingRequestItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ffe0b2',
+  },
+  removeButton: {
+    backgroundColor: '#F44336',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 5,
+  },
+  removeButtonText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
 });
 
