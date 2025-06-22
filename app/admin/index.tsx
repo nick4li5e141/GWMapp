@@ -1,7 +1,7 @@
 import firestore, { Timestamp } from '@react-native-firebase/firestore';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Button as RNButton, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Button as RNButton, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 interface User {
   id: string;
@@ -48,30 +48,36 @@ const AdminDashboard = () => {
        const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
        const lastDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6));
 
-       const firstDay = firstDayOfWeek.toISOString().split('T')[0];
-       const lastDay = lastDayOfWeek.toISOString().split('T')[0];
-
-       console.log('Filtering requests for the week:', firstDay, 'to', lastDay);
+       firstDayOfWeek.setHours(0, 0, 0, 0);
+       lastDayOfWeek.setHours(23, 59, 59, 999);
 
        for (const user of usersList) {
          const requestsSnapshot = await firestore()
            .collection('gwm')
            .doc(user.id)
            .collection('dayOffRequests')
-           .where('date', '>=', firstDay)
-           .where('date', '<=', lastDay)
-           .get();
+           .get(); // Fetch all requests, not just filtered by date
 
          requestsSnapshot.forEach(doc => {
            const data = doc.data();
-           allRequests.push({
-             id: doc.id,
-             userId: user.id,
-             userEmail: user.email,
-             date: data.date,
-             status: data.status,
-             requestedAt: data.requestedAt,
-           } as DayOffRequest);
+           let reqDate: Date | null = null;
+           if (typeof data.date === 'string') {
+             // Parse string date (YYYY-MM-DD)
+             reqDate = new Date(data.date + 'T00:00:00');
+           } else if (data.date && data.date.toDate) {
+             // Firestore Timestamp
+             reqDate = data.date.toDate();
+           }
+           if (reqDate) {
+             allRequests.push({
+               id: doc.id,
+               userId: user.id,
+               userEmail: user.email,
+               date: typeof data.date === 'string' ? data.date : reqDate.toISOString().split('T')[0],
+               status: data.status,
+               requestedAt: data.requestedAt,
+             } as DayOffRequest);
+           }
          });
        }
 
@@ -175,7 +181,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.header}>Admin Dashboard</Text>
       <Text style={styles.subHeader}>User List</Text>
       <FlatList
@@ -183,6 +189,7 @@ const AdminDashboard = () => {
         renderItem={renderUserItem}
         keyExtractor={item => item.id}
         ListEmptyComponent={<Text>No users found.</Text>}
+        contentContainerStyle={{ paddingBottom: 20 }}
       />
 
       <Text style={styles.subHeader}>Day Off Requests</Text>
@@ -192,7 +199,7 @@ const AdminDashboard = () => {
         keyExtractor={item => item.id + item.userId}
         ListEmptyComponent={<Text>No day off requests found.</Text>}
       />
-    </View>
+    </ScrollView>
   );
 };
 

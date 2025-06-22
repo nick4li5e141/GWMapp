@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import Firestore from '@react-native-firebase/firestore';
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -207,8 +208,37 @@ export default function Maintenance() {
     return Math.round((completed / tasks.length) * 100);
   };
 
+  const handleSubmitToFirestore = async () => {
+    const userId = 'user_001'; // Replace with dynamic user ID if needed
+    const today = new Date().toISOString().split('T')[0];
+
+    const dataToSend = {
+      date: today,
+      readings, // from your state
+      tasks,    // from your state
+      submittedAt: Firestore.FieldValue.serverTimestamp(),
+    };
+
+    try {
+      await Firestore()
+        .collection('gwm')
+        .doc(userId)
+        .collection('maintenance')
+        .add(dataToSend);
+      Alert.alert('Success', 'Maintenance data submitted!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to submit maintenance data.');
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
+      {/* Address Card */}
+      <View style={styles.addressCard}>
+        <Ionicons name="location" size={24} color="#3b82f6" style={styles.addressIcon} />
+        <Text style={styles.addressText}>223 Perry St, Whitby, ON</Text>
+      </View>
+
       <Text style={styles.header}>Maintenance Dashboard</Text>
 
       {/* Progress Overview */}
@@ -221,79 +251,78 @@ export default function Maintenance() {
       </View>
 
       {/* Mechanical Room Readings */}
-      <Text style={styles.sectionTitle}>Mechanical Room Readings</Text>
-      <Text style={styles.sectionSubtitle}>Check and record equipment measurements</Text>
-      
-      {readings.map(reading => {
-        const status = getReadingStatus(reading);
-        return (
-          <Pressable 
-            key={reading.id} 
-            style={styles.readingCard}
-            onPress={() => {
-              setSelectedReading(reading);
-              setCurrentValue(reading.currentValue.toString());
-              setNotes(reading.notes);
-              setShowReadingModal(true);
-            }}
-          >
-            <View style={styles.readingHeader}>
-              <View style={styles.readingTitleRow}>
-                <Ionicons name={reading.icon as any} size={24} color="#3b82f6" style={styles.readingIcon} />
-                <Text style={styles.readingName}>{reading.name}</Text>
+      <View style={styles.sectionGroup}>
+        <Text style={styles.sectionTitle}>Mechanical Room Readings</Text>
+        <Text style={styles.sectionSubtitle}>Check and record equipment measurements</Text>
+        {readings.map(reading => {
+          const status = getReadingStatus(reading);
+          return (
+            <Pressable 
+              key={reading.id} 
+              style={styles.readingCard}
+              onPress={() => {
+                setSelectedReading(reading);
+                setCurrentValue(reading.currentValue.toString());
+                setNotes(reading.notes);
+                setShowReadingModal(true);
+              }}
+            >
+              <View style={styles.readingHeader}>
+                <View style={styles.readingTitleRow}>
+                  <Ionicons name={reading.icon as any} size={24} color="#3b82f6" style={styles.readingIcon} />
+                  <Text style={styles.readingName}>{reading.name}</Text>
+                </View>
+                <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(status) }]}> 
+                  <Text style={styles.statusText}>{getStatusText(status)}</Text>
+                </View>
               </View>
-              <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(status) }]}>
-                <Text style={styles.statusText}>{getStatusText(status)}</Text>
-              </View>
-            </View>
-            
-            <View style={styles.readingDetails}>
-              <Text style={styles.readingValue}>
-                {reading.isChecked ? `${reading.currentValue} ${reading.unit}` : 'Not recorded'}
-              </Text>
-              <Text style={styles.readingRange}>
-                Normal Range: {reading.normalRange.min} - {reading.normalRange.max} {reading.unit}
-              </Text>
-            </View>
-            
-            {reading.notes && (
-              <Text style={styles.readingNotes}>Notes: {reading.notes}</Text>
-            )}
-          </Pressable>
-        );
-      })}
-
-      {/* Maintenance Tasks */}
-      <Text style={styles.sectionTitle}>Maintenance Tasks</Text>
-      <Text style={styles.sectionSubtitle}>Daily and weekly maintenance activities</Text>
-      
-      {tasks.map(task => (
-        <Pressable 
-          key={task.id} 
-          style={[styles.taskCard, task.isCompleted && styles.taskCompleted]}
-          onPress={() => toggleTask(task.id)}
-        >
-          <View style={styles.taskHeader}>
-            <View style={[styles.checkbox, task.isCompleted && styles.checkboxChecked]}>
-              {task.isCompleted && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <View style={styles.taskInfo}>
-              <View style={styles.taskTitleRow}>
-                <Ionicons name={task.icon as any} size={20} color="#64748b" style={styles.taskIcon} />
-                <Text style={[styles.taskName, task.isCompleted && styles.taskNameCompleted]}>
-                  {task.name}
+              <View style={styles.readingDetails}>
+                <Text style={styles.readingValue}>
+                  {reading.isChecked ? `${reading.currentValue} ${reading.unit}` : 'Not recorded'}
+                </Text>
+                <Text style={styles.readingRange}>
+                  Normal Range: {reading.normalRange.min} - {reading.normalRange.max} {reading.unit}
                 </Text>
               </View>
-              <Text style={styles.taskDescription}>{task.description}</Text>
-              <Text style={styles.taskFrequency}>{task.frequency} task</Text>
+              {reading.notes && (
+                <Text style={styles.readingNotes}>Notes: {reading.notes}</Text>
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Maintenance Tasks */}
+      <View style={styles.sectionGroup}>
+        <Text style={styles.sectionTitle}>Maintenance Tasks</Text>
+        <Text style={styles.sectionSubtitle}>Daily and weekly maintenance activities</Text>
+        {tasks.map(task => (
+          <Pressable 
+            key={task.id} 
+            style={[styles.taskCard, task.isCompleted && styles.taskCompleted]}
+            onPress={() => toggleTask(task.id)}
+          >
+            <View style={styles.taskHeader}>
+              <View style={[styles.checkbox, task.isCompleted && styles.checkboxChecked]}>
+                {task.isCompleted && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <View style={styles.taskInfo}>
+                <View style={styles.taskTitleRow}>
+                  <Ionicons name={task.icon as any} size={20} color="#64748b" style={styles.taskIcon} />
+                  <Text style={[styles.taskName, task.isCompleted && styles.taskNameCompleted]}>
+                    {task.name}
+                  </Text>
+                </View>
+                <Text style={styles.taskDescription}>{task.description}</Text>
+                <Text style={styles.taskFrequency}>{task.frequency} task</Text>
+              </View>
             </View>
-          </View>
-          
-          {task.lastCompleted && (
-            <Text style={styles.lastCompleted}>Last completed: {task.lastCompleted}</Text>
-          )}
-        </Pressable>
-      ))}
+            {task.lastCompleted && (
+              <Text style={styles.lastCompleted}>Last completed: {task.lastCompleted}</Text>
+            )}
+          </Pressable>
+        ))}
+      </View>
 
       {/* Reading Modal */}
       {showReadingModal && selectedReading && (
@@ -303,7 +332,6 @@ export default function Maintenance() {
               <Ionicons name={selectedReading.icon as any} size={32} color="#3b82f6" style={styles.modalIcon} />
               <Text style={styles.modalTitle}>Update {selectedReading.name}</Text>
             </View>
-            
             <Text style={styles.modalLabel}>Current Reading ({selectedReading.unit})</Text>
             <TextInput
               style={styles.modalInput}
@@ -312,7 +340,6 @@ export default function Maintenance() {
               placeholder={`Enter ${selectedReading.unit} value`}
               keyboardType="numeric"
             />
-            
             <Text style={styles.modalLabel}>Notes (Optional)</Text>
             <TextInput
               style={[styles.modalInput, styles.notesInput]}
@@ -321,7 +348,6 @@ export default function Maintenance() {
               placeholder="Add any notes or observations..."
               multiline
             />
-            
             <View style={styles.modalButtons}>
               <Pressable 
                 style={[styles.modalButton, styles.cancelButton]}
@@ -344,6 +370,21 @@ export default function Maintenance() {
           </View>
         </View>
       )}
+
+      <Pressable
+        style={{
+          backgroundColor: '#3b82f6',
+          padding: 16,
+          borderRadius: 8,
+          alignItems: 'center',
+          marginVertical: 20,
+        }}
+        onPress={handleSubmitToFirestore}
+      >
+        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+          Submit Maintenance Data
+        </Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -605,5 +646,26 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  addressCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e0e7ff',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 18,
+    marginTop: 8,
+    elevation: 1,
+  },
+  addressIcon: {
+    marginRight: 10,
+  },
+  addressText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#3730a3',
+  },
+  sectionGroup: {
+    marginBottom: 24,
   },
 });
