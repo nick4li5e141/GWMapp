@@ -188,19 +188,19 @@ export default function Homepage(): ReactElement {
 
   // Navigation handlers for each button
   const handleMySchedule = () => {
-    router.push('/pages/MySchedule');
+    router.push('/MySchedule');
   };
 
   const handleCurrentJob = () => {
-    router.push('/pages/CurrentJobs');
+    router.push('/CurrentJobs');
   };
 
   const handleBenefit = () => {
-    router.push('/pages/Benefit');
+    router.push('/Benefit');
   };
 
   const handleMaintenance = () => {
-    router.push('/pages/Maintenance');
+    router.push('/Maintenance');
   };
 
   return (

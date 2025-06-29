@@ -1,11 +1,10 @@
 import { Box, Button, Center, GluestackUIProvider, Heading, Input, InputField, Text } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import firestore from '@react-native-firebase/firestore';
 import { useRouter } from 'expo-router';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import React, { useState } from 'react';
-import { Platform } from 'react-native';
-import { app } from '../../firebase.config';
+// Import Firebase configuration
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../../firebase.config';
 
 interface UserData {
   address: string;
@@ -50,73 +49,33 @@ export default function Signin(): JSX.Element {
     try {
       setLoading(true);
       setErrors({}); // Clear any previous errors
-      let userData: UserData | null = null;
 
-      if (Platform.OS === 'web') {
-        const db = getFirestore(app);
-        
-        try {
-          const userDoc = await getDoc(doc(db, 'gwm', 'user_001'));
-          
-          if (!userDoc.exists()) {
-            setErrors({ general: 'No account found with this email' });
-            return;
-          }
+      // Query for user by email
+      const usersRef = collection(db, 'gwm');
+      const userQuery = query(usersRef, where('email', '==', email));
+      const querySnapshot = await getDocs(userQuery);
 
-          userData = userDoc.data() as UserData;
-          
-          if (userData.email !== email) {
-            setErrors({ general: 'No account found with this email' });
-            return;
-          }
-          
-          if (userData.password !== password) {
-            setErrors({ password: 'Incorrect password' });
-            return;
-          }
-
-          // Create session after successful authentication
-          await createSession(userData);
-        } catch (error) {
-          setErrors({ general: 'Failed to sign in. Please try again.' });
-          return;
-        }
-      } else {
-        try {
-          const userDoc = await firestore()
-            .collection('gwm')
-            .doc('user_001')
-            .get();
-
-          if (!userDoc.exists) {
-            setErrors({ general: 'No account found with this email' });
-            return;
-          }
-
-          userData = userDoc.data() as UserData;
-          
-          if (userData.email !== email) {
-            setErrors({ general: 'No account found with this email' });
-            return;
-          }
-          
-          if (userData.password !== password) {
-            setErrors({ password: 'Incorrect password' });
-            return;
-          }
-
-          // Create session after successful authentication
-          await createSession(userData);
-        } catch (error) {
-          setErrors({ general: 'Failed to sign in. Please try again.' });
-          return;
-        }
+      if (querySnapshot.empty) {
+        setErrors({ general: 'No account found with this email' });
+        return;
       }
+
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data() as UserData;
+
+      if (userData.password !== password) {
+        setErrors({ password: 'Incorrect password' });
+        return;
+      }
+
+      // Create session after successful authentication
+      await createSession(userData);
 
       // Navigate to tabs
       router.replace('/(tabs)');
       
     } catch (error: any) {
+      console.error('Error signing in:', error);
       setErrors({ general: 'Failed to sign in. Please try again.' });
     } finally {
       setLoading(false);

@@ -9,10 +9,12 @@ import {
   VStack,
 } from '@gluestack-ui/themed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import firestore from '@react-native-firebase/firestore';
 import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
+// Import Firebase configuration
+import { collection, doc, getDocs, limit, query, where } from 'firebase/firestore';
+import { db } from '../../firebase.config';
 
 interface PayrollDetails {
   hoursWorked: number;
@@ -77,11 +79,7 @@ export default function Payroll(): JSX.Element {
       const paymentDate = new Date(selectedYear, selectedMonth - 1, 5);
 
       // Reference to the month document (e.g., '2023-10')
-      const monthDocRef = firestore()
-        .collection('gwm')
-        .doc(userId)
-        .collection('scheduledShiftsDetails')
-        .doc(monthYear);
+      const monthDocRef = doc(db, 'gwm', userId, 'scheduledShiftsDetails', monthYear);
 
       const weeklyEarnings: { week: string; amount: number }[] = [];
       let totalHours = 0;
@@ -95,9 +93,9 @@ export default function Payroll(): JSX.Element {
         const shiftDate = new Date(selectedYear, selectedMonth - 1, day);
 
         // Fetch jobs from the date subcollection under the month document
-        const jobsSnapshot = await monthDocRef.collection(dateString).get();
+        const jobsSnapshot = await getDocs(collection(db, 'gwm', userId, 'scheduledShiftsDetails', monthYear, dateString));
 
-        jobsSnapshot.forEach((jobDoc) => {
+        jobsSnapshot.forEach((jobDoc: any) => {
           const jobData = jobDoc.data() as Job;
           if (jobData) {
             console.log('Fetched jobData:', jobData);
@@ -157,11 +155,12 @@ export default function Payroll(): JSX.Element {
         if (sessionData) {
           const session = JSON.parse(sessionData);
           if (session.isAuthenticated && session.email) {
-            const usersRef = firestore().collection('gwm');
-            const userQuery = await usersRef.where('email', '==', session.email).limit(1).get();
+            const usersRef = collection(db, 'gwm');
+            const userQuery = query(usersRef, where('email', '==', session.email), limit(1));
+            const userSnapshot = await getDocs(userQuery);
 
-            if (!userQuery.empty) {
-              const userId = userQuery.docs[0].id;
+            if (!userSnapshot.empty) {
+              const userId = userSnapshot.docs[0].id;
               setCurrentUserId(userId);
               await fetchPayrollData(userId);
             }

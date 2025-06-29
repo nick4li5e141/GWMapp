@@ -1,9 +1,11 @@
 import { Box, Button, Center, GluestackUIProvider, Heading, Input, InputField, Text } from '@gluestack-ui/themed';
-import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert } from 'react-native';
+// Import Firebase configuration
+import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase.config';
 
 export default function Signup(): JSX.Element {
   const router = useRouter();
@@ -34,10 +36,10 @@ export default function Signup(): JSX.Element {
         return;
       }
       // Create user in Firebase Auth
-      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+      const userCredential = await createUserWithEmailAndPassword(getAuth(), email, password);
       const user = userCredential.user;
       // Save additional info to Firestore
-      await firestore().collection('users').doc(user.uid).set({
+      await setDoc(doc(db, 'users', user.uid), {
         name,
         phoneNumber,
         email,

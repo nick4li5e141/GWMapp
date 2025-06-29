@@ -65,22 +65,11 @@ export default function RootLayout() {
             headerShown: false,
           }}
         >
-          <Stack.Screen
-            name="index"
-            redirect={isAuthenticated}
-          />
-          <Stack.Screen
-            name="(tabs)"
-            redirect={!isAuthenticated}
-          />
-          <Stack.Screen
-            name="signin"
-            redirect={isAuthenticated}
-          />
-          <Stack.Screen
-            name="pages"
-            redirect={!isAuthenticated}
-          />
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="signin" />
+          <Stack.Screen name="admin" />
+          <Stack.Screen name="pages" />
         </Stack>
       </ThemeProvider>
     </GluestackUIProvider>

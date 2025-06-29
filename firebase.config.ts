@@ -1,5 +1,5 @@
-import firebase from '@react-native-firebase/app';
-import firestore from '@react-native-firebase/firestore';
+import { getApps, initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCbF7KS5N4IbmXTHDyaHaqdPhMhSz-qa34',
@@ -12,13 +12,16 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase only if it hasn't been initialized yet
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
+let app;
+if (getApps().length === 0) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApps()[0];
 }
 
 // Export the initialized app and Firestore instance
-export const app = firebase.app();
-export const db = firestore();
+export const firebaseApp = app;
+export const db = getFirestore(app);
 
 export { firebaseConfig };
 

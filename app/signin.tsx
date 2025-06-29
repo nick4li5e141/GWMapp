@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import firestore from '@react-native-firebase/firestore';
 import { useNavigation, useRouter, useSegments } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { BackHandler, View } from 'react-native';
+import { BackHandler, Platform, View } from 'react-native';
 
 interface UserData {
   address: string;
@@ -63,27 +63,29 @@ export default function Signin(): JSX.Element {
     checkSession();
   }, []);
 
-  // Handle back button press
+  // Handle back button press (Android only)
   useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      // Check if user is authenticated
-      const checkAuth = async () => {
-        const sessionData = await AsyncStorage.getItem('userSession');
-        if (sessionData) {
-          const session: SessionData = JSON.parse(sessionData);
-          if (session.isAuthenticated) {
-            router.replace('/(tabs)');
-            return true;
+    if (Platform.OS === 'android') {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        // Check if user is authenticated
+        const checkAuth = async () => {
+          const sessionData = await AsyncStorage.getItem('userSession');
+          if (sessionData) {
+            const session: SessionData = JSON.parse(sessionData);
+            if (session.isAuthenticated) {
+              router.replace('/(tabs)');
+              return true;
+            }
           }
-        }
-        return false;
-      };
-      
-      checkAuth();
-      return true;
-    });
+          return false;
+        };
+        
+        checkAuth();
+        return true;
+      });
 
-    return () => backHandler.remove();
+      return () => backHandler.remove();
+    }
   }, []);
 
   const createSession = async (userData: UserData) => {
@@ -109,21 +111,41 @@ export default function Signin(): JSX.Element {
       setLoading(true);
       setErrors({}); // Clear any previous errors
 
-      // Query for user by email
-      const usersRef = firestore().collection('gwm');
-      const userQuery = await usersRef.where('email', '==', email).get();
+      let userData: UserData | null = null;
 
-      if (userQuery.empty) {
-        setErrors({ general: 'No account found with this email' });
-        return;
-      }
+      if (Platform.OS === 'web') {
+        // Mock data for web testing
+        userData = {
+          address: '123 Test St',
+          email: 'test@example.com',
+          name: 'Test User',
+          password: 'password123',
+          phoneNumber: '123-456-7890',
+          role: 'user'
+        };
+        
+        // Check if credentials match mock data
+        if (email !== userData.email || password !== userData.password) {
+          setErrors({ general: 'Invalid credentials. Use test@example.com / password123' });
+          return;
+        }
+      } else {
+        // Use React Native Firebase on mobile
+        const usersRef = firestore().collection('gwm');
+        const userQuery = await usersRef.where('email', '==', email).get();
 
-      const userDoc = userQuery.docs[0];
-      const userData = userDoc.data() as UserData;
+        if (userQuery.empty) {
+          setErrors({ general: 'No account found with this email' });
+          return;
+        }
 
-      if (userData.password !== password) {
-        setErrors({ password: 'Incorrect password' });
-        return;
+        const userDoc = userQuery.docs[0];
+        userData = userDoc.data() as UserData;
+
+        if (userData.password !== password) {
+          setErrors({ password: 'Incorrect password' });
+          return;
+        }
       }
 
       // Create session after successful authentication
